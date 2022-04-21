@@ -10,7 +10,9 @@ The folder "python" contains python code that uses the vegas (https://vegas.read
 Both codes are largely redundant, implement mostly the same functions and features and were used for cross-checking results. The C++-code is to be preferred for performance reasons. 
 
 ## Dependencies
-Python:
+
+### Python
 - numpy, scipy, matplotlib, vegas, numba
-C++:
+
+### C++:
 - cuba, gsl, gslwrap, boost
