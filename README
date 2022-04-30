@@ -1,0 +1,13 @@
+Compile with
+usr/bin/g++ -I/usr/local/include -I/home/xerox/Documents/Masterarbeit/C/include -I/home/xerox/Documents/Masterarbeit/C/include/cuba -L/usr/local/lib -std=c++17 -O3 /home/xerox/Documents/Masterarbeit/C/pt_main.cpp tomo.cpp spectrum.cpp -o /home/xerox/Documents/Masterarbeit/C/pt_main -lgsl -lgslcblas -lgslwrap -lcuba -lm -fopenmp
+
+External dependencies:
+cuba
+libgsl 
+gslwrap 
+openmp 
+boost (header only)
+
+Optional dependencies:
+boost (libraries for testing)
+splinter (Not implemented)

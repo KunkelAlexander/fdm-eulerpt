@@ -348,3 +348,16 @@ MigrationBackup/
 
 # Ionide (cross platform F# VS Code tools) working folder
 .ionide/
+
+libraries
+IC
+.vscode
+*.eps 
+*.p 
+*.png 
+*.npz
+*.dat
+*.guess
+include/cuba
+tomo.cpp
+tomo.h
