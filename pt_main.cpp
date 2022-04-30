@@ -56,19 +56,20 @@ void computeGrowthFactor(double k, int fdm_mass_id, const std::string filename, 
 
 void computeGrowthFactors(int fdm_mass_id)
 {
-    computeGrowthFactor(1e-3, fdm_mass_id, cosmo_string+"_k = 1e-3_" + fdm_mass_strings[fdm_mass_id], 2000);
-    computeGrowthFactor(5,    fdm_mass_id, cosmo_string+"_k = 5_"    + fdm_mass_strings[fdm_mass_id], 2000);
-    computeGrowthFactor(25,   fdm_mass_id, cosmo_string+"_k = 25_"   + fdm_mass_strings[fdm_mass_id], 2000);
-    computeGrowthFactor(100,  fdm_mass_id, cosmo_string+"_k = 100_"  + fdm_mass_strings[fdm_mass_id], 2000);
+    computeGrowthFactor(1e-3, fdm_mass_id, fdm_strings[fdm_mass_id] + "_k=1e-3", 2000);
+    computeGrowthFactor(5,    fdm_mass_id, fdm_strings[fdm_mass_id] + "_k=5"   , 2000);
+    computeGrowthFactor(25,   fdm_mass_id, fdm_strings[fdm_mass_id] + "_k=25"  , 2000);
+    computeGrowthFactor(100,  fdm_mass_id, fdm_strings[fdm_mass_id] + "_k=100" , 2000);
 }
 
-void computeFDMSuppression(double a, int fdm_mass_id, const std::string filename, size_t n)
+void computeFDMSuppression(double a, int fdm_mass_id, size_t n = 1000)
 {
     std::vector<double> x1, y1, y2, y3, y4;
     x1 = pyLogspace(0, 2, n);
 
     CDM::D_spline d1(true);
     FDM::D_spline d2(const_eta_in, fdm_mass_id, true);
+    FDM::D_hybrid d3(fdm_mass_id);
 
     double eta = eta_from_a(a);
 
@@ -77,10 +78,11 @@ void computeFDMSuppression(double a, int fdm_mass_id, const std::string filename
         y1.push_back(FDM::D_plus_analytical(k, eta, eta_from_a(const_a_in),   fdm_masses[fdm_mass_id]) / CDM::D(eta, const_eta_in));
         y2.push_back(FDM::D_plus_renormalised(k, eta, eta_from_a(const_a_in), fdm_masses[fdm_mass_id]) / CDM::D(eta, const_eta_in));
         y3.push_back(d2(k, eta) / d1(a));
+        y4.push_back(d3(k, eta) / d1(a));
     }
 
     std::ofstream outdata;                                          
-    outdata.open("data/fdm_suppression/" + filename + ".dat"); 
+    outdata.open("data/fdm_suppression/" + fdm_strings[fdm_mass_id] + "a=" + std::to_string(a) + ".dat"); 
     if (!outdata)
     { // file couldn't be opened
         std::cerr << "Error: file for storing CDM P1L could not be opened" << std::endl;
@@ -554,16 +556,16 @@ void computeNonlinearScales(int fdm_mass_id)
     CDM::CDM_Numerical_CosmoUtil cu_cdm(fdm_mass_id, const_eta_fin, const_eta_in);
     FDM::FDM_SemiNumerical_CosmoUtil cu_fdm(fdm_mass_id, const_eta_fin, const_eta_in);
 
-    computeNonlinearScale(cu_cdm, P_cdm, "cdm_z=0", N);
-    computeNonlinearScale(cu_fdm, P_fdm, fdm_mass_strings[fdm_mass_id]+"_z=0", N);
+    computeNonlinearScale(cu_cdm, P_cdm, cdm_string + "_z=0", N);
+    computeNonlinearScale(cu_fdm, P_fdm, fdm_strings[fdm_mass_id]+"_z=0", N);
 
     cu_cdm.eta = const_eta_in;
     cu_fdm.eta = const_eta_in;
-    computeNonlinearScale(cu_cdm, P_cdm, "cdm_z=99", N);
-    computeNonlinearScale(cu_fdm, P_fdm, fdm_mass_strings[fdm_mass_id]+"_z=99", N);
+    computeNonlinearScale(cu_cdm, P_cdm, cdm_string + "_z=99", N);
+    computeNonlinearScale(cu_fdm, P_fdm, fdm_strings[fdm_mass_id]+"_z=99", N);
 }
 
-void computeTreeSpectra(int fdm_mass_id)
+void computeTreeSpectra(int fdm_mass_id, size_t N = 1000)
 {
     cout << "Load CDM CAMB spectrum \n";
     CAMBSpectrum P_cdm(cdm_camb_path);
@@ -572,51 +574,22 @@ void computeTreeSpectra(int fdm_mass_id)
 
 
     //Compute CDM tree spectra
-    #if 0
+    #if 1
     cout << "Integrate CDM growth factor \n";
-    CDM::CDM_Numerical_CosmoUtil cu_cdm(const_eta_fin, const_eta_in);
+    CDM::CDM_Numerical_CosmoUtil cu_cdm(fdm_mass_id, const_eta_fin, const_eta_in);
 
     cout << "Compute CDM spectra\n";
-    compute_spectrum(cu_cdm, P_cdm, "cdm", N);
+    computeSpectrum(cu_cdm, P_cdm, cdm_string, N);
     #endif 
 
     //Compute FDM tree spectra
-    #if 0
+    #if 1
     cout << "Integrate FDM growth factor \n";
-    FDM::FDM_SemiNumerical_CosmoUtil cu_fdm_num(const_fdm_mass, const_eta_fin, const_eta_in);
-    FDM::FDM_Fit_CosmoUtil           cu_fdm_fit(const_fdm_mass, const_eta_fin, const_eta_in);
-
+    FDM::FDM_SemiNumerical_CosmoUtil cu_fdm_num(fdm_mass_id, const_eta_fin, const_eta_in);
     cout << "Compute FDM spectra\n";
-    computeSpectrum(cu_fdm_num, P_fdm, "fdm_num_"+mass_string, N);
-    computeSpectrum(cu_fdm_fit, P_fdm, "fdm_fit_"+mass_string, N);
-    #endif
-
-    //Compute FDM tree spectra
-    #if 0
-    cout << "Integrate FDM growth factor \n";
-    FDM::FDM_SemiNumerical_CosmoUtil cu_fdm_num(const_fdm_mass, const_eta_fin, const_eta_in);
-    FDM::FDM_Fit_CosmoUtil           cu_fdm_fit(const_fdm_mass, const_eta_fin, const_eta_in);
-
-    cout << "Compute FDM spectra\n";
-    computeSpectrum(cu_fdm_num, P_fdm, "fdm_num_"+mass_string, N);
-    computeSpectrum(cu_fdm_fit, P_fdm, "fdm_fit_"+mass_string, N);
-    #endif
-
-    #if 0
-    CDM::CDM_Numerical_CosmoUtil  cu_cdm(const_eta_fin, const_eta_in);
-    FDM::FDM_Analytical_CosmoUtil cu_fdm(const_fdm_mass, const_eta_fin, const_eta_in);
-
-    SplineSpectrum P_cdm_spl("splines/cdm.dat");
-    computeSpectrum(cu_cdm,   P_cdm_spl, "cdm_cdm_for_eq",     N);
-    SplineSpectrum P_fdm_spl1("splines/fdm_m23.dat");
-    computeSpectrum(cu_fdm,   P_fdm_spl1, "fdm_m23_for_eq", N);
-    SplineSpectrum P_fdm_spl2("splines/fdm_m22.dat");
-    computeSpectrum(cu_fdm,   P_fdm_spl2, "fdm_m22_for_eq", N);
-    SplineSpectrum P_fdm_spl3("splines/fdm_m21.dat");
-    computeSpectrum(cu_fdm,   P_fdm_spl3, "fdm_m21_for_eq", N);
+    computeSpectrum(cu_fdm_num, P_fdm, fdm_strings[fdm_mass_id], N);
     #endif
 }
-
 
 
 void computeTreeDimensionlessEquilateral(int fdm_mass_id, size_t N = 100)
@@ -626,13 +599,15 @@ void computeTreeDimensionlessEquilateral(int fdm_mass_id, size_t N = 100)
     CAMBSpectrum P_fdm(fdm_camb_paths[fdm_mass_id]);
 
     CDM::TreeBispectrum B_cdm(P_cdm);
-    FDM::VegasTreeBispectrum B_fdm(P_fdm);
+    FDM::TreeBispectrum B_fdm(P_fdm);
 
     CDM::CDM_Numerical_CosmoUtil     cu_cdm(fdm_mass_id, const_eta_fin, const_eta_in);
     FDM::FDM_SemiNumerical_CosmoUtil cu_fdm(fdm_mass_id, const_eta_fin, const_eta_in);
 
-    computeEquilateralReducedBispectrum(cu_cdm, B_cdm, "cdm", N);
-    computeEquilateralReducedBispectrum(cu_fdm, B_fdm, "fdm_"+fdm_mass_strings[fdm_mass_id], N);
+    gsl_error_handler_t * old_handler=gsl_set_error_handler_off();
+    computeEquilateralReducedBispectrum(cu_cdm, B_cdm, cdm_string, N);
+    computeEquilateralReducedBispectrum(cu_fdm, B_fdm, fdm_strings[fdm_mass_id], N);
+    gsl_set_error_handler(old_handler);
 }
 
 void computeLoopSpectra(int fdm_mass_id)
@@ -641,73 +616,23 @@ void computeLoopSpectra(int fdm_mass_id)
     double k0 = 1e-4;
     int N = 50;
 
-    #if 1
+    #if 0
         cout << "Load CDM CAMB spectrum \n";
         CAMBSpectrum P_cdm(cdm_camb_path);
         CDM::CDM_Numerical_CosmoUtil cu_cdm(fdm_mass_id, const_eta_fin, const_eta_in);
-        CDM::NLSpectrum P1L_cdm(P_cdm, VEGAS_IR_CUTOFF, VEGAS_UV_CUTOFF, k0, cu_cdm, 1);
+        CDM::NLSpectrum P1L_cdm(P_cdm, const_vegas_ir_cutoff, const_vegas_uv_cutoff, k0, cu_cdm, 1);
         cout << "Integrate CDM Loop corrections. \n";
-        computeLoopPowerSpectrum(cu_cdm,   cu_cdm,     P_cdm, P1L_cdm, "cdm", N);
+        computeLoopPowerSpectrum(cu_cdm,   cu_cdm,     P_cdm, P1L_cdm, cdm_string, N);
     #endif
     
     #if 1
         cout << "Load FDM CAMB spectrum \n";
         CAMBSpectrum P_fdm(fdm_camb_paths[fdm_mass_id]);
         FDM::FDM_SemiNumerical_CosmoUtil cu_fdm_num(fdm_mass_id, const_eta_fin, const_eta_in);
-        FDM::NLSpectrum P1L_fdm(P_fdm, VEGAS_IR_CUTOFF, VEGAS_UV_CUTOFF, k0, cu_fdm_num, 0);
+        FDM::NLSpectrum P1L_fdm(P_fdm, const_vegas_ir_cutoff, const_vegas_uv_cutoff, k0, cu_fdm_num, 0);
 
         cout << "Integrate FDM Loop corrections. \n";
-        computeLoopPowerSpectrum(cu_fdm_num, cu_fdm_num, P_fdm, P1L_fdm, "fdm_num_num_"+fdm_mass_strings[fdm_mass_id], N);
-    #endif
-}
-
-
-void computeLoopSpectrumSplines()
-{
-    size_t N = 100;
-
-    #if 0
-    cout << "Integrate CDM growth factor \n";
-    CDM::CDM_Numerical_CosmoUtil cu_cdm(const_eta_fin, const_eta_in);
-
-    cout << "Load CDM CAMB spectrum \n";
-    CAMBSpectrum P_cdm(cdm_camb_path);
-
-    // Used for initialising VEGAS integrator
-    double k0 = 1e-4;
-
-    cout << "Compute CDM P1L spline \n";
-    CDM::NLSpectrum P1L_cdm(P_cdm, VEGAS_IR_CUTOFF, VEGAS_UV_CUTOFF, k0, cu_cdm, 2);
-    //compute_P1L_spline(cu_cdm, cu_cdm, P_cdm, P1L_cdm, "cdm");
-
-    cu_cdm.eta    = const_eta_fin;
-
-    SplineSpectrum P_cdm_spl("splines/cdm.dat");
-
-    compute_spectrum(cu_cdm,   P_cdm_spl, "cdm_spline",     N);
-    #endif 
-
-    #if 0
-
-    cout << "Load FDM CAMB spectrum \n";
-    CAMBSpectrum P_fdm(fdm_camb_path);
-
-    double k0 = 1e-4;
-
-    FDM::FDM_SemiNumerical_CosmoUtil  cu_fdm(const_fdm_mass, const_eta_fin, const_eta_in);
-
-    cout << "Compute FDM P1L spline \n";
-    FDM::NLSpectrum P1L_fdm(P_fdm, VEGAS_IR_CUTOFF, VEGAS_UV_CUTOFF, k0, cu_fdm, 2);
-    computeLoopPowerSpectrumSpline(cu_fdm, cu_fdm, P_fdm, P1L_fdm, "fdm_"+mass_string);
-
-    cu_fdm.eta  = const_eta_fin;
-    cu_fdm.eta  = const_eta_fin;
-
-    SplineSpectrum P_fdm_spl("splines/fdm_"+mass_string+".dat");
-
-    cout << "Integrate FDM growth factor \n";
-    computeSpectrum(cu_fdm, P_fdm_spl, "fdm_spline_"+mass_string, N);
-    
+        computeLoopPowerSpectrum(cu_fdm_num, cu_fdm_num, P_fdm, P1L_fdm, fdm_strings[fdm_mass_id], N);
     #endif
 }
 
@@ -750,9 +675,9 @@ void computeTreeBispectra(int fdm_mass_id)
     FDM::TreeBispectrum B_fdm(P_fdm);
 
     computeAngularReducedBispectrum(cu_cdm, B_cdm, "cdm_r1=20_r2=10", N, 20, 10);
-    computeAngularReducedBispectrum(cu_fdm, B_fdm, "fdm_r1=20_r2=10_"+fdm_mass_strings[fdm_mass_id], N, 20, 10);
+    computeAngularReducedBispectrum(cu_fdm, B_fdm, fdm_strings[fdm_mass_id] + "_r1=20_r2=10", N, 20, 10);
     computeAngularReducedBispectrum(cu_cdm, B_cdm, "cdm_r1=02_r2=01", N, .2, .1);
-    computeAngularReducedBispectrum(cu_fdm, B_fdm, "fdm_r1=02_r2=01_"+fdm_mass_strings[fdm_mass_id], N, .2, .1);
+    computeAngularReducedBispectrum(cu_fdm, B_fdm, fdm_strings[fdm_mass_id] + "_r1=02_r2=01", N, .2, .1);
 }
 
 //Gives exactly 0 for low k only if we use the CDM mode coupling, FDM mode coupling consistently gives ~1 percent difference even for low k. Why?
@@ -799,11 +724,11 @@ void computeLoopBispectra(int fdm_mass_id)
 {
     #if 0
     CAMBSpectrum   P_cdm(cdm_camb_path);
-    CDM::NLSpectrum P_cdm_1l(P_cdm, VEGAS_IR_CUTOFF, VEGAS_UV_CUTOFF, 5);
+    CDM::NLSpectrum P_cdm_1l(P_cdm, VEGAS_IR_CUTOFF, const_vegas_uv_cutoff, 5);
     //SplineSpectrum P_cdm_1l();
     CDM::CDM_Numerical_CosmoUtil cu_cdm(const_eta_fin, const_eta_in);
     CDM::TreeBispectrum B_cdm(P_cdm);
-    CDM::NLBispectrum   B1L_cdm(P_cdm, B_cdm, VEGAS_IR_CUTOFF, VEGAS_UV_CUTOFF);
+    CDM::NLBispectrum   B1L_cdm(P_cdm, B_cdm, VEGAS_IR_CUTOFF, const_vegas_uv_cutoff);
     CDM::NLRBispectrum  B1L_red_cdm(P_cdm, P_cdm_1l, B1L_cdm);
 
 
@@ -825,11 +750,11 @@ void computeLoopBispectra(int fdm_mass_id)
 
     #if 1
     CAMBSpectrum P_fdm(fdm_camb_paths[fdm_mass_id]);
-    FDM::NLSpectrum P_fdm_1l(P_fdm, VEGAS_IR_CUTOFF, VEGAS_UV_CUTOFF, 5);
+    FDM::NLSpectrum P_fdm_1l(P_fdm, const_vegas_ir_cutoff, const_vegas_uv_cutoff, 5);
     //SplineSpectrum P_fdm_1l();
     FDM::FDM_SemiNumerical_CosmoUtil cu_fdm(fdm_mass_id, const_eta_fin, const_eta_in);
     FDM::VegasTreeBispectrum B_fdm(P_fdm);
-    FDM::NLBispectrum B1L_fdm(P_fdm, B_fdm, VEGAS_IR_CUTOFF, VEGAS_UV_CUTOFF);
+    FDM::NLBispectrum B1L_fdm(P_fdm, B_fdm, const_vegas_ir_cutoff, const_vegas_uv_cutoff);
     FDM::NLRBispectrum  B1L_red_fdm(P_fdm, P_fdm_1l, B1L_fdm);
 
     #if 0
@@ -841,7 +766,7 @@ void computeLoopBispectra(int fdm_mass_id)
     #endif
 
     #if 1
-    computeEquilateralReducedLoopBispectrum(cu_fdm, B1L_red_fdm, "loop_" + fdm_mass_strings[fdm_mass_id], 10);
+    computeEquilateralReducedLoopBispectrum(cu_fdm, B1L_red_fdm, "loop_" + fdm_strings[fdm_mass_id], 10);
     #endif
     #endif
 
@@ -863,7 +788,7 @@ void computeTreeTrispectra(int fdm_mass_id)
     std::cout << "compute CDM Tree Trispectra \n";
     {
         //boost::timer::auto_cpu_timer t;
-        computeEquilateralTrispectra(cu_cdm, T_cdm, "cdm", N);
+        computeEquilateralTrispectra(cu_cdm, T_cdm, cdm_string, N);
     }
     #endif
 
@@ -872,7 +797,7 @@ void computeTreeTrispectra(int fdm_mass_id)
     std::cout << "compute FDM Tree Trispectra by integrating using Vegas \n";
     {
         //boost::timer::auto_cpu_timer t;
-        computeEquilateralTrispectra(cu_fdm, T_fdm_vegas, fdm_mass_strings[fdm_mass_id], N);
+        computeEquilateralTrispectra(cu_fdm, T_fdm_vegas, fdm_strings[fdm_mass_id], N);
     }
     #endif
 
@@ -945,26 +870,26 @@ int main()
 
     //Relative suppression between cdm and fdm growth factors
     #if 0 
-        computeFDMSuppression(1, cosmo_string, 1000);
+        computeFDMSuppression(const_a_fin, i);
     #endif
     
     //Print difference between CDM and FDM CAMB spectra at different momenta
     #if 0
-        computeTreeSpectrumDifference();
+        computeTreeSpectrumDifference(i);
     #endif
 
-    #if 1
+    #if 0
         computeNonlinearScales(i);
     #endif
 
     //Tree power spectra
     #if 0
-        computeTreeSpectra();
+        computeTreeSpectra(i);
     #endif 
 
     //Loop power spectra
     #if 0
-        computeLoopSpectra();
+        computeLoopSpectra(i);
     #endif 
 
     //Loop spectrum splines
@@ -974,8 +899,8 @@ int main()
     #endif 
 
     //Tree Bispectra
-    #if 0
-        computeTreeBispectra();
+    #if 1
+        computeTreeBispectra(i);
     #endif 
 
     //Print difference between CDM and FDM bispectra at different configurations
@@ -984,8 +909,8 @@ int main()
     #endif
 
     //Dimensionless equilateral tree bispectra
-    #if 0
-        computeTreeDimensionlessEquilateral();
+    #if 1
+        computeTreeDimensionlessEquilateral(i);
     #endif 
 
     //Loop bispectra
@@ -997,7 +922,7 @@ int main()
 
     //Tree Trispectra
     #if 0
-        computeTreeTrispectra();
+        computeTreeTrispectra(i);
     #endif
     
     //Print difference between CDM and FDM trispectra at different configurations

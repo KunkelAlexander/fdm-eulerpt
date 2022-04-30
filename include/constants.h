@@ -39,12 +39,23 @@
 #define const_a_fin    1
 #define const_eta_fin  2
 
-const std::string cosmo_string  = "de_z99";
+//#define EDS
+
+#ifdef EDS
+    const std::string cosmo_string  = "eds";
+#else 
+    const std::string cosmo_string  = "fc";
+#endif 
 const std::string cdm_camb_path = "IC/cdm.dat";
+const std::string cdm_string    = cosmo_string + "_cdm";
 
 const double fdm_masses[3] = {1e-21, 1e-22, 1e-23};
 const std::string fdm_mass_strings[3] = {"m21", "m22", "m23"};
-const std::string fdm_camb_paths[3] = {"IC/m21.dat", "IC/m22.dat", "IC/m23.dat"};
+const std::string fdm_strings[3]      = {cosmo_string + "_m21", cosmo_string + "_m22", cosmo_string + "_m23"};
+const std::string fdm_camb_paths[3]   = {"IC/m21.dat", "IC/m22.dat", "IC/m23.dat"};
+
+const double fdm_growth_factor_fit_alpha[3] = {0.61, 0.61, 0.61};
+const double fdm_growth_factor_fit_beta[3] = {6.46, 6.46, 6.46};
 
 //const std::string cdm_loop_spectrum_path        = "";//"splines/cdm.dat";
 //const std::string fdm_loop_spectrum_path        = "";//"splines/"+fdm_string+".dat";
@@ -53,44 +64,39 @@ const std::string fdm_camb_paths[3] = {"IC/m21.dat", "IC/m22.dat", "IC/m23.dat"}
 //const std::string loop_difference_lensing_path  = "";//"data/lensing_spectrum/loop/"+fdm_string+"_diff.dat";
 
 
-#define SAVE_D_SPLINES 1
-#define LOAD_D_SPLINES 0
+#define SAVE_D_SPLINES 0
+#define LOAD_D_SPLINES 1
 
 /***
  * COSMOLOGY
  * **/
-#define const_omega_m  0.315903
+#ifdef EDS
+    #define const_omega_m  1
+#else 
+    #define const_omega_m  0.315903
+#endif 
 #define const_omega_b  0.04938726593811469
 #define const_h_hubble 0.67321170
-
 #define const_omega_dm (const_omega_m - const_omega_b)
 #define const_omega_q  (1.0 - const_omega_m)
 #define const_w_dark_energy -0.9
 #define const_w_dark_energy_prime 0.0
 #define const_sigma8  0.8
 #define const_rsmooth 8.0   
-
 const double const_hubble_bar  = const_hubble * pow(const_omega_m, 0.5);
 
 //Spectral index in Bardeen spectrum
 const double n_s = 1.0;
 
 //Lower cutoff for radial momentum integrations in loop spectra, translates to k_min = IR_CUTOFF/(1 - IR_CUTOFF)
-#define VEGAS_IR_CUTOFF 1e-4
+#define const_vegas_ir_cutoff 1e-4
 //Lower cutoff for radial momentum integrations in loop spectra, translates to k_max = infinity
-#define VEGAS_UV_CUTOFF 1
+#define const_vegas_uv_cutoff 1
 
 //Number of time steps (scale factors) used in loop spectrum interpolation
 const size_t p1l_spline_na = 20;
 //Number of momentum steps used in loop spectrum interpolation
 const size_t p1l_spline_nk = 100;
-
-#if 0
-//Number of time steps (scale factors) used in loop bispectrum interpolation
-const size_t b1l_spline_na = 5;
-//Number of momentum steps used in loop bispectrum interpolation
-const size_t b1l_spline_nk = 15;
-#endif 
 
 const double TOMO_SPECTRUM_ABSERR         = 0;
 const double TOMO_SPECTRUM_RELERR         = 1e-5;

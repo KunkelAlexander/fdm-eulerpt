@@ -382,6 +382,13 @@ namespace FDM
     double f_i                (double k, double s, double eta, size_t i);
   };
 
+  //Interpolated CDM growth factor with suppression below Jeans scale
+  struct D_hybrid {
+    CDM::D_spline s;
+    int fdm_mass_id;
+    D_hybrid(int fdm_mass_id);
+    double operator() (double k, double eta);
+  };
 
   //CDM spectrum with FDM transfer function at time const_eta_in
   struct InitialFDMSpectrum : public BardeenSpectrum

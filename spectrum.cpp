@@ -6,7 +6,7 @@
 #include <list>
 //#include <boost/timer/timer.hpp>
 #include <fstream>
-
+#include <vector>
 #if 0
 #include <datatable.h>
 #include <bsplinebuilder.h>
@@ -566,7 +566,7 @@ CAMBSpectrum::CAMBSpectrum(const std::string &filename)
   inFile.open(filename);
   if (!inFile)
   {
-    std::cerr << "Unable to open spline file in CAMB spectrum";
+    std::cerr << "Unable to open spline file in CAMB spectrum with filename "<<filename<<"\n";
     throw std::runtime_error("Unable to open spline file in CAMB spectrum");
   }
 
@@ -1294,6 +1294,20 @@ namespace FDM
     return result;
   }
 
+
+  D_hybrid::D_hybrid(int fdm_mass_id) : s(), fdm_mass_id(fdm_mass_id)
+  {
+  }
+
+  double D_hybrid::operator()(double k, double eta)
+  {
+    double a = a_from_eta(eta);
+    double kj = jeans_scale(const_eta_in, fdm_masses[fdm_mass_id]);
+
+    return 1 / (1 + fdm_growth_factor_fit_alpha[fdm_mass_id] * pow(k / kj, fdm_growth_factor_fit_beta[fdm_mass_id])) * s(a);
+  }
+
+
   G_spline::G_spline(double eta_in, int fdm_mass_id) : dp(eta_in, fdm_mass_id, true), dm(eta_in, fdm_mass_id, false)
   {
   }
@@ -1399,31 +1413,31 @@ namespace FDM
     }
   }
   // Clever numerical implemention of Bessel function derivatives taken from Python's numpy library
-  double my_bessel_diff_formula(double v, double z, size_t n, double phase)
-  {
-    double p = 1.0;
-    double s = boost::math::cyl_bessel_j(v - n, z);
-    for (size_t i = 1; i < n + 1; ++i)
-    {
-      p = phase * (p * (n - i + 1)) / i;
-      s += p * boost::math::cyl_bessel_j(v - n + i * 2, z);
-    }
-    return s / pow(2., n);
-  }
-
-  // nth derivative of cylindrical Bessel function of fractional order
-  double my_jvp(double v, double z, size_t n)
-  {
-    // Return the nth derivative of Jv(z) with respect to z.
-    if (n == 0)
-    {
-      return boost::math::cyl_bessel_j(v, z);
-    }
-    else
-    {
-      return my_bessel_diff_formula(v, z, n, -1.);
-    }
-  }
+  //double my_bessel_diff_formula(double v, double z, size_t n, double phase)
+  //{
+  //  double p = 1.0;
+  //  double s = boost::math::cyl_bessel_j(v - n, z);
+  //  for (size_t i = 1; i < n + 1; ++i)
+  //  {
+  //    p = phase * (p * (n - i + 1)) / i;
+  //    s += p * boost::math::cyl_bessel_j(v - n + i * 2, z);
+  //  }
+  //  return s / pow(2., n);
+  //}
+//
+  //// nth derivative of cylindrical Bessel function of fractional order
+  //double my_jvp(double v, double z, size_t n)
+  //{
+  //  // Return the nth derivative of Jv(z) with respect to z.
+  //  if (n == 0)
+  //  {
+  //    return boost::math::cyl_bessel_j(v, z);
+  //  }
+  //  else
+  //  {
+  //    return my_bessel_diff_formula(v, z, n, -1.);
+  //  }
+  //}
 
   double m_bar(double m)
   {
