@@ -59,8 +59,8 @@ const double fdm_growth_factor_fit_beta[3] = {6.46, 6.46, 6.46};
 
 //const std::string cdm_loop_spectrum_path        = "";//"splines/cdm.dat";
 //const std::string fdm_loop_spectrum_path        = "";//"splines/"+fdm_string+".dat";
-//const std::string cdm_loop_lensing_path         = "";//"data/lensing_spectrum/loop/cdm_new.dat";
-//const std::string fdm_loop_lensing_path         = "";//"data/lensing_spectrum/loop/"+fdm_string+".dat";
+const std::string cdm_loop_lensing_path           = "data/lensing_spectrum/loop/"+ cdm_string + ".dat";
+const std::string fdm_loop_lensing_paths[3]        = {"data/lensing_spectrum/loop/"+fdm_strings[0]+".dat", "data/lensing_spectrum/loop/"+fdm_strings[1]+".dat", "data/lensing_spectrum/loop/"+fdm_strings[2]+".dat"};
 //const std::string loop_difference_lensing_path  = "";//"data/lensing_spectrum/loop/"+fdm_string+"_diff.dat";
 
 

@@ -480,6 +480,50 @@ void computeEquilateralReducedLoopBispectrum(const CosmoUtil &cu, const Bispectr
     outdata.close();
 }
 
+
+/****
+ * Comute loop-level reduced bispectrum for n datapoints and given linear spectrum P
+ ****/
+void computeEquilateralLoopBispectrum(const CosmoUtil &cu, const Bispectrum &B1L, const std::string filename, size_t n = 3)
+{
+    std::cout << "Create reduced loop bispectrum" << std::endl;
+
+    std::vector<double> x(n), y1(n), y2(n), y3(n), y4(n), y5(n), y6(n), y7(n), y8(n);
+    x = pyLogspace(-4, 3, n-1);
+    x.push_back(1000);
+
+    for (size_t i = 0; i < n; ++i)
+    {
+        std::cout << i +1<<"/"<<n<<"\n";
+
+        auto triangle = generateTriangle();
+        triangle[0] = triangle[0] * x[i];
+        triangle[1] = triangle[1] * x[i];
+        triangle[2] = triangle[2] * x[i];
+
+        vec result(B1L.get_result(triangle[0], triangle[1], triangle[2], cu));
+        y1[i] = result[0];             // Reduced bispectrum at tree level
+        y2[i] = result[1];             // Reduced bispectrum 1-loop correction
+        y3[i] = result[2];             // Error of 1-loop correction
+    }
+
+    std::ofstream outdata;                                         
+    outdata.open("data/bispectrum/equilateral/loop/" + filename + ".dat"); 
+    if (!outdata)
+    { // file couldn't be opened
+        std::cerr << "Error: file for storing CDM B1L could not be opened" << std::endl;
+        throw std::invalid_argument("Invalid filename");
+    }
+
+    outdata << boost::format("%1% %|15t|%2% %|30t|%3% %|45t|%4%\n") % "Angle" % "BTR" % "BNLR" % "BNLR_err" ;
+
+    for (size_t i = 0; i < x.size(); ++i)
+    {
+        outdata << boost::format("%1% %|15t|%2% %|30t|%3% %|45t|%4%\n") % x[i] % y1[i] % y2[i] % y3[i];
+    }
+    outdata.close();
+}
+
 /****
  * TRISPECTRA
  ****/
@@ -574,7 +618,7 @@ void computeTreeSpectra(int fdm_mass_id, size_t N = 1000)
 
 
     //Compute CDM tree spectra
-    #if 1
+    #if 0
     cout << "Integrate CDM growth factor \n";
     CDM::CDM_Numerical_CosmoUtil cu_cdm(fdm_mass_id, const_eta_fin, const_eta_in);
 
@@ -583,11 +627,19 @@ void computeTreeSpectra(int fdm_mass_id, size_t N = 1000)
     #endif 
 
     //Compute FDM tree spectra
-    #if 1
+    #if 0
     cout << "Integrate FDM growth factor \n";
     FDM::FDM_SemiNumerical_CosmoUtil cu_fdm_num(fdm_mass_id, const_eta_fin, const_eta_in);
     cout << "Compute FDM spectra\n";
     computeSpectrum(cu_fdm_num, P_fdm, fdm_strings[fdm_mass_id], N);
+    #endif
+
+
+    #if 1
+    cout << "Integrate FDM growth factor \n";
+    FDM::FDM_Fit_CosmoUtil cu_fdm_num(fdm_mass_id, const_eta_fin, const_eta_in);
+    cout << "Compute FDM spectra\n";
+    computeSpectrum(cu_fdm_num, P_fdm, "fit_"+fdm_strings[fdm_mass_id], N);
     #endif
 }
 
@@ -606,7 +658,7 @@ void computeTreeDimensionlessEquilateral(int fdm_mass_id, size_t N = 100)
 
     gsl_error_handler_t * old_handler=gsl_set_error_handler_off();
     computeEquilateralReducedBispectrum(cu_cdm, B_cdm, cdm_string, N);
-    computeEquilateralReducedBispectrum(cu_fdm, B_fdm, fdm_strings[fdm_mass_id], N);
+    //computeEquilateralReducedBispectrum(cu_fdm, B_fdm, fdm_strings[fdm_mass_id], N);
     gsl_set_error_handler(old_handler);
 }
 
@@ -616,16 +668,16 @@ void computeLoopSpectra(int fdm_mass_id)
     double k0 = 1e-4;
     int N = 50;
 
-    #if 0
+    #if 1
         cout << "Load CDM CAMB spectrum \n";
         CAMBSpectrum P_cdm(cdm_camb_path);
-        CDM::CDM_Numerical_CosmoUtil cu_cdm(fdm_mass_id, const_eta_fin, const_eta_in);
-        CDM::NLSpectrum P1L_cdm(P_cdm, const_vegas_ir_cutoff, const_vegas_uv_cutoff, k0, cu_cdm, 1);
+        CDM::CDM_TD_CosmoUtil cu_cdm(fdm_mass_id, const_eta_fin, const_eta_in);
+        FDM::NLSpectrum P1L_cdm(P_cdm, const_vegas_ir_cutoff, const_vegas_uv_cutoff, k0, cu_cdm, 1);
         cout << "Integrate CDM Loop corrections. \n";
-        computeLoopPowerSpectrum(cu_cdm,   cu_cdm,     P_cdm, P1L_cdm, cdm_string, N);
+        computeLoopPowerSpectrum(cu_cdm, cu_cdm, P_cdm, P1L_cdm, cdm_string+"_td", N);
     #endif
     
-    #if 1
+    #if 0
         cout << "Load FDM CAMB spectrum \n";
         CAMBSpectrum P_fdm(fdm_camb_paths[fdm_mass_id]);
         FDM::FDM_SemiNumerical_CosmoUtil cu_fdm_num(fdm_mass_id, const_eta_fin, const_eta_in);
@@ -674,9 +726,9 @@ void computeTreeBispectra(int fdm_mass_id)
     CDM::TreeBispectrum B_cdm(P_cdm);
     FDM::TreeBispectrum B_fdm(P_fdm);
 
-    computeAngularReducedBispectrum(cu_cdm, B_cdm, "cdm_r1=20_r2=10", N, 20, 10);
+    computeAngularReducedBispectrum(cu_cdm, B_cdm, cdm_string + "_r1=20_r2=10", N, 20, 10);
     computeAngularReducedBispectrum(cu_fdm, B_fdm, fdm_strings[fdm_mass_id] + "_r1=20_r2=10", N, 20, 10);
-    computeAngularReducedBispectrum(cu_cdm, B_cdm, "cdm_r1=02_r2=01", N, .2, .1);
+    computeAngularReducedBispectrum(cu_cdm, B_cdm, cdm_string + "_r1=02_r2=01", N, .2, .1);
     computeAngularReducedBispectrum(cu_fdm, B_fdm, fdm_strings[fdm_mass_id] + "_r1=02_r2=01", N, .2, .1);
 }
 
@@ -761,12 +813,13 @@ void computeLoopBispectra(int fdm_mass_id)
     computeAngularReducedLoopBispectrum(cu_fdm, B1L_red_fdm, fdm_string + "_r1=02_r2=01", 10, .2, .1);
     computeAngularReducedLoopBispectrum(cu_fdm, B1L_red_fdm, fdm_string + "_r1=20_r2=10", 10, 20, 10);
     #endif
-    #if 0
-    computeEquilateralBispectrum(cu_fdm, P_fdm, B1L_fdm, "fdm_loop_"+mass_string, 10);
-    #endif
 
     #if 1
-    computeEquilateralReducedLoopBispectrum(cu_fdm, B1L_red_fdm, "loop_" + fdm_strings[fdm_mass_id], 10);
+    computeEquilateralLoopBispectrum(cu_fdm, B1L_fdm, fdm_strings[fdm_mass_id], 20);
+    #endif
+
+    #if 0
+    computeEquilateralReducedLoopBispectrum(cu_fdm, B1L_red_fdm, fdm_strings[fdm_mass_id], 10);
     #endif
     #endif
 
@@ -861,7 +914,7 @@ void computeTreeTrispectrumDifference(int fdm_mass_id)
 
 int main()
 {
-    for (int i = 0; i < 3; ++ i) {
+    for (int i = 0; i < 1; ++ i) {
 
     //Growth factors
     #if 0
@@ -888,7 +941,7 @@ int main()
     #endif 
 
     //Loop power spectra
-    #if 0
+    #if 1
         computeLoopSpectra(i);
     #endif 
 
@@ -898,26 +951,24 @@ int main()
         computeLoopSpectrumAnimation();
     #endif 
 
-    //Tree Bispectra
-    #if 1
-        computeTreeBispectra(i);
-    #endif 
-
     //Print difference between CDM and FDM bispectra at different configurations
     #if 0
         computeTreeBispectrumDifference();
     #endif
 
+    //Tree Bispectra
+    #if 0
+        computeTreeBispectra(i);
+    #endif 
+
     //Dimensionless equilateral tree bispectra
-    #if 1
+    #if 0
         computeTreeDimensionlessEquilateral(i);
     #endif 
 
     //Loop bispectra
-    #if 0 
-        computeLoopBispectra();
-        //computeLoopBispectrumSpline();
-        //readBSpline();
+    #if 0
+        computeLoopBispectra(i);
     #endif
 
     //Tree Trispectra

@@ -621,6 +621,18 @@ namespace CDM
     double f_i            (double k, double s, double eta, size_t i) const;
   };
 
+  struct CDM_TD_CosmoUtil : public CosmoUtil {
+    //Use 2-dimensional FDM spline and evaluate at low k to make sure that CDM and FDM growth factors at low k are exactly equal
+    std::shared_ptr<FDM::D_spline> d;
+    CDM_TD_CosmoUtil(int fdm_mass_id, double eta, double eta_in);
+    double D              (double k, double eta)                     const;    
+    double greens         (double k, double s, double eta)           const;
+    double d_s_greens     (double k, double s, double eta)           const;
+    double d_eta_greens   (double k, double s, double eta)           const;
+    double d_s_eta_greens (double k, double s, double eta)           const;
+    double f_i            (double k, double s, double eta, size_t i) const;
+  };
+
   //Cartesian bispectrum at tree level
   double BT (const Spectrum &P,               const vec &k1, const vec &k2, const vec &k3, const CosmoUtil &cu);
 
@@ -742,6 +754,23 @@ namespace FDM
   struct FDM_FullyNumerical_CosmoUtil : public CosmoUtil {
     std::shared_ptr<G_spline> g;
     FDM_FullyNumerical_CosmoUtil(int fdm_mass_id, double eta, double eta_in);
+    double D              (double k, double eta)                     const;
+    double greens         (double k, double s, double eta)           const;
+    double d_s_greens     (double k, double s, double eta)           const;
+    double d_eta_greens   (double k, double s, double eta)           const;
+    double d_s_eta_greens (double k, double s, double eta)           const;
+    double f_i            (double k, double s, double eta, size_t i) const;
+  };
+
+
+
+  //NCDM growth functions suppressed below Jeans scale for arbitrary cosmology and analytical propagators for MDU
+  //ADAPT CONSTANTS ALPHA AND BETA in constants.h for given cosmology to make sure that suppression is correct
+  //We obtain them by fitting the model to the numerically integrated growth functions
+  //BUT: fits are rather poor which is why we stuck to FDM_SemiNumerical_CosmoUtil
+  struct FDM_Fit_CosmoUtil : public CosmoUtil {
+    std::shared_ptr<D_hybrid> d;
+    FDM_Fit_CosmoUtil     (int fdm_mass_id, double eta, double eta_in);
     double D              (double k, double eta)                     const;
     double greens         (double k, double s, double eta)           const;
     double d_s_greens     (double k, double s, double eta)           const;

@@ -18,7 +18,7 @@
 #define LAST 4
 #define SEED 0
 #define MINEVAL 0
-#define MAXEVAL 300000
+#define MAXEVAL 10000
 
 #define NSTART 1000
 #define NINCREASE 500
@@ -946,6 +946,14 @@ namespace CDM
   double CDM_Numerical_CosmoUtil::d_s_eta_greens (double k, double s, double eta)           const {return 0;}
   double CDM_Numerical_CosmoUtil::f_i            (double k, double s, double eta, size_t i) const {return 0;}
   
+  CDM_TD_CosmoUtil::CDM_TD_CosmoUtil(int fdm_mass_id, double eta, double eta_in) : CosmoUtil(1, eta, eta_in), d(new FDM::D_spline(eta_in, fdm_mass_id, true))  {}
+  double CDM_TD_CosmoUtil::D              (double k, double eta)                     const {return (*d)(1e-3, eta);}          
+  double CDM_TD_CosmoUtil::greens         (double k, double s, double eta)           const {return FDM::greens_analytical         (k, s, eta, m);}
+  double CDM_TD_CosmoUtil::d_s_greens     (double k, double s, double eta)           const {return FDM::d_s_greens_analytical     (k, s, eta, m);}
+  double CDM_TD_CosmoUtil::d_eta_greens   (double k, double s, double eta)           const {return FDM::d_eta_greens_analytical   (k, s, eta, m);}
+  double CDM_TD_CosmoUtil::d_s_eta_greens (double k, double s, double eta)           const {return FDM::d_s_eta_greens_analytical (k, s, eta, m);}
+  double CDM_TD_CosmoUtil::f_i            (double k, double s, double eta, size_t i) const {return FDM::f_i_analytical            (k, s, eta, m, i);}
+  
 
 }
 
@@ -1455,7 +1463,7 @@ namespace FDM
   double jeans_scale(double eta, double m)
   {
     double a = a_from_eta(eta);
-    return 44.7 * pow(6 * a * const_omega_m / 0.3, 0.25) * pow(const_h_hubble / 0.7 * m / (1e-22), 0.5); // #Mpc^-1
+    return 44.7 * const_h_hubble * pow(6 * a * const_omega_m / 0.3, 0.25) * pow(1 / 0.7 * m / (1e-22), 0.5); // #Mpc^-1
   }
 
   // Mass and momentum dependent FDM-scale
@@ -1667,6 +1675,16 @@ namespace FDM
   double FDM_FullyNumerical_CosmoUtil::d_s_eta_greens (double k, double s, double eta)           const {return g->d_s_eta_propagator (k, s, eta);}
   double FDM_FullyNumerical_CosmoUtil::f_i            (double k, double s, double eta, size_t i) const {return g->f_i                (k, s, eta, i);}
 
+
+  FDM_Fit_CosmoUtil::FDM_Fit_CosmoUtil(int fdm_mass_id, double eta, double eta_in) : CosmoUtil(fdm_masses[fdm_mass_id], eta, eta_in), d(new D_hybrid(fdm_mass_id)) {}
+  double FDM_Fit_CosmoUtil::D              (double k, double eta)                     const {return (*d)(k, eta);} 
+  double FDM_Fit_CosmoUtil::greens         (double k, double s, double eta)           const {return greens_analytical         (k, s, eta, m)   ;}
+  double FDM_Fit_CosmoUtil::d_s_greens     (double k, double s, double eta)           const {return d_s_greens_analytical     (k, s, eta, m)   ;}
+  double FDM_Fit_CosmoUtil::d_eta_greens   (double k, double s, double eta)           const {return d_eta_greens_analytical   (k, s, eta, m)   ;}
+  double FDM_Fit_CosmoUtil::d_s_eta_greens (double k, double s, double eta)           const {return d_s_eta_greens_analytical (k, s, eta, m)   ;}
+  double FDM_Fit_CosmoUtil::f_i            (double k, double s, double eta, size_t i) const {return f_i_analytical            (k, s, eta, m, i);}
+
+
   // FDM mode coupling function to linear order
   // Involves contributions from derivatives of density and velocity field
   // as well as linear contribution from quantum pressure
@@ -1711,9 +1729,16 @@ namespace FDM
     {
       if ((a == 0) && (b == 0))
       {
+
+        double ks = dot(k, k);
+        if (ks < verysmalleps)
+        {
+          return 0;
+        }
+
         double bk = b_f(k.norm2(), mass);
         double p1 = pow(bk, 2) / (4 * pow(eta, 4));
-        double p2 = 1 + (dot(k1, k1) + dot(k2, k2)) / dot(k, k);
+        double p2 = 1 + (dot(k1, k1) + dot(k2, k2)) / ks;
         return -p1 * p2;
       }
 
@@ -1747,14 +1772,24 @@ namespace FDM
 
   double theta2111(const vec &k, const vec &k1, const vec &k2, const vec &k3, double s, double eta, double m)
   {
+    double ks = dot(k, k);
+    if (ks < verysmalleps)
+    {
+      return 0;
+    }
     double bk = b_f(k.norm2(), m);
-    return pow(bk, 2) / pow(eta, 4) / 8. * (1. + (dot(k1, k1) + dot(k2, k2) + dot(k3, k3)) / dot(k, k) + 1 / 3. * (ssum(k1, k2) + ssum(k2, k3) + ssum(k1, k3)) / dot(k, k));
+    return pow(bk, 2) / pow(eta, 4) / 8. * (1. + (dot(k1, k1) + dot(k2, k2) + dot(k3, k3)) / ks + 1 / 3. * (ssum(k1, k2) + ssum(k2, k3) + ssum(k1, k3)) / ks);
   }
 
   double xi2111(const vec &k, const vec &k1, const vec &k2, const vec &k3, const vec &k4, double s, double eta, double m)
   {
+    double ks = dot(k, k);
+    if (ks < verysmalleps)
+    {
+      return 0;
+    }
     double bk = b_f(k.norm2(), m);
-    return -pow(bk, 2) / pow(eta, 4) * 3. / 32. * (1. + 2. / 3 * (dot(k1, k1) + dot(k2, k2) + dot(k3, k3) + dot(k4, k4)) / dot(k, k) + 1. / 3 * (ssum(k1, k2) + ssum(k1, k3) + ssum(k1, k4) + ssum(k3, k2) + ssum(k2, k4) + ssum(k4, k3)) / dot(k, k));
+    return -pow(bk, 2) / pow(eta, 4) * 3. / 32. * (1. + 2. / 3 * (dot(k1, k1) + dot(k2, k2) + dot(k3, k3) + dot(k4, k4)) / ks + 1. / 3 * (ssum(k1, k2) + ssum(k1, k3) + ssum(k1, k4) + ssum(k3, k2) + ssum(k2, k4) + ssum(k4, k3)) / ks);
   }
 
   double W_coupling(const vec &k, const vec &k1, const vec &k2, double s, double eta, const CosmoUtil &cu, size_t i, size_t a, size_t b)
@@ -2611,7 +2646,7 @@ namespace FDM
     double p, p_error, p_Q;
     T0_IC ic(k1, k2, k3, k4, P, cu, NULL);
     void *data = (void *)&ic;
-    cuba_integrate(T0i_cuba, 2, data, p, p_error, p_Q, 4, 0, CUBA_ALGORITHMS::DIVONNE, 1e-2, 1e-36);
+    cuba_integrate(T0i_cuba, 2, data, p, p_error, p_Q, 4, 0, CUBA_ALGORITHMS::VEGAS, 1e-2, 1e-36);
 
     result[0] = p;
     result[1] = p_error;
@@ -3290,7 +3325,7 @@ namespace FDM
         cuba_integrate(P1Li_cuba, 4, data, p, p_error, p_Q, -gridno);
         std::cout << "Reset complete \n";
       }
-      cuba_integrate(P1Li_cuba, 4, data, p, p_error, p_Q, gridno, 1, CUBA_ALGORITHMS::VEGAS, 0.01, 1e-20);
+      cuba_integrate(P1Li_cuba, 4, data, p, p_error, p_Q, gridno, 1, CUBA_ALGORITHMS::DIVONNE, 0.01, 1e-20);
       if (((P(k, cu) + p) > 0))
       {
         break;
@@ -3332,7 +3367,7 @@ namespace FDM
     void *USERDATA = (void *)&ic;
     double b1, b1_error, b1_Q;
 
-    cuba_integrate(B1Li_cuba, 6, USERDATA, b1, b1_error, b1_Q, -gridno);
+    //cuba_integrate(B1Li_cuba, 6, USERDATA, b1, b1_error, b1_Q, -gridno);
   }
 
   double NLBispectrum::operator()(const vec &k1, const vec &k2, const vec &k3, const CosmoUtil &cu) const
@@ -3347,7 +3382,7 @@ namespace FDM
     void *USERDATA = (void *)&ic;
     double b1, b1_error, b1_Q;
 
-    cuba_integrate(B1Li_cuba, 6, USERDATA, b1, b1_error, b1_Q, gridno, 1, CUBA_ALGORITHMS::VEGAS, 0.01, 1e-20);
+    cuba_integrate(B1Li_cuba, 6, USERDATA, b1, b1_error, b1_Q, gridno, 1, CUBA_ALGORITHMS::DIVONNE, 0.01, 1e-20);
 
     // Compute tree-level bispectrum
     vec r1 = tree.get_result(k1, k2, k3, cu);
