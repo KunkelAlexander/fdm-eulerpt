@@ -9,6 +9,10 @@ The folder "cpp" contains the C++-code that uses the CUBA (http://www.feynarts.d
 The folder "python" contains python code that uses the vegas (https://vegas.readthedocs.io/en/latest/) library for carrying out numerical integrations.
 Both codes are largely redundant, implement mostly the same functions and features and were used for cross-checking results. The C++-code is to be preferred for performance reasons. 
 
+## Compilation
+Set include and library paths and compile with
+g++ -I/path_to_cuba -std=c++11 -O3 pt_main.cpp spectrum.cpp -o pt_main -lgsl -lgslcblas -lgslwrap -lcuba -lm
+
 ## Dependencies
 
 ### Python
