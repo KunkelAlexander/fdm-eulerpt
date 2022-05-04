@@ -28,7 +28,7 @@
 typedef gsl::vector_float vec;
 
 //Default maximum number of integrand evaluations for CUBA integrations
-const size_t max_evaluations = 1000000;
+const size_t max_evaluations = 400000;
 #define SPLINE_RANGE_CHECK
 
 /***
@@ -163,31 +163,6 @@ protected:
 };
 
 
-//Use Bardeen fit to provide initial spectrum at z = 99
-class BardeenSpectrum : public Spectrum
-{
-
-public:
-  BardeenSpectrum();
-
-  //Return CDM spectrum at z = 99 in given cosmology
-  double P0(double k) const;
-  double operator()(double k, const CosmoUtil &cu) const;
-
-  // Bardeen - CDM transfer function
-  static double transfer_function(double k);
-  static double sigma8();
-  static double aux_dsigma8(double k, void *params);
-  static double spectrum_aux(double k);
-
-protected:
-  double anorm;
-
-private:
-  double d0;
-};
-
-
 //Interpolate lensing spectrum given by filename
 //Expected file format is text file with two columns consisting of multipole moment l and P_kappa(l)
 class LensingSpectrum
@@ -262,18 +237,6 @@ namespace CDM
     double amin_, amax_;
     D_spline(bool growingMode = true);
     double operator() (double a);
-  };
-
-  struct InitialCDMSpectrum : public BardeenSpectrum
-  {
-    //Return value of linear CDM power spectrum given by fitting form
-    double operator()(double k, const CosmoUtil &cu) const;
-  };
-
-  struct InitialFDMSpectrum : public BardeenSpectrum
-  {
-    //Return value of linear CDM power spectrum given by fitting form
-    double operator()(double k, const CosmoUtil &cu) const;
   };
 
   struct ScaleFreeSpectrum : public Spectrum
@@ -390,19 +353,6 @@ namespace FDM
     double operator() (double k, double eta);
   };
 
-  //CDM spectrum with FDM transfer function at time const_eta_in
-  struct InitialFDMSpectrum : public BardeenSpectrum
-  {
-    //Return spectrum at time given by c.eta_f after linear evolution from FDM-like initial conditions at c.eta_i
-    double operator()(double k, const CosmoUtil &cu) const;
-  };
-
-  //CDM spectrum at time const_eta_in
-  struct InitialCDMSpectrum : public BardeenSpectrum
-  {
-    //Return spectrum at time given by c.eta_f after linear evolution from CDM-like initial conditions at c.eta_i
-    double operator()(double k, const CosmoUtil &cu) const;
-  };
 
   struct ScaleFreeSpectrum : public Spectrum
   {

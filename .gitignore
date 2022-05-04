@@ -371,3 +371,4 @@ src/lensing_code_test.cpp
 lensing_main.cpp
 pt_main
 test.ipynb
+lensing_main

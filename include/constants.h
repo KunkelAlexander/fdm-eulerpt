@@ -42,17 +42,20 @@
 //#define EDS
 
 #ifdef EDS
+//Einstein-de Sitter cosmology with Omega_m = 1
     const std::string cosmo_string  = "eds";
 #else 
+//Fiducial cosmology
     const std::string cosmo_string  = "fc";
 #endif 
 const std::string cdm_camb_path = "IC/cdm.dat";
 const std::string cdm_string    = cosmo_string + "_cdm";
 
 const double fdm_masses[3] = {1e-21, 1e-22, 1e-23};
-const std::string fdm_mass_strings[3] = {"m21", "m22", "m23"};
-const std::string fdm_strings[3]      = {cosmo_string + "_m21", cosmo_string + "_m22", cosmo_string + "_m23"};
-const std::string fdm_camb_paths[3]   = {"IC/m21.dat", "IC/m22.dat", "IC/m23.dat"};
+const std::string fdm_mass_strings[3]    = {"m21", "m22", "m23"};
+const std::string fdm_strings[3]         = {cosmo_string + "_m21", cosmo_string + "_m22", cosmo_string + "_m23"};
+const std::string cdm_fdm_ic_strings[3]  = {cosmo_string + "_cdm_m21", cosmo_string + "_cdm_m22", cosmo_string + "_cdm_m23"};
+const std::string fdm_camb_paths[3]      = {"IC/m21.dat", "IC/m22.dat", "IC/m23.dat"};
 
 const double fdm_growth_factor_fit_alpha[3] = {0.61, 0.61, 0.61};
 const double fdm_growth_factor_fit_beta[3] = {6.46, 6.46, 6.46};
@@ -60,7 +63,7 @@ const double fdm_growth_factor_fit_beta[3] = {6.46, 6.46, 6.46};
 //const std::string cdm_loop_spectrum_path        = "";//"splines/cdm.dat";
 //const std::string fdm_loop_spectrum_path        = "";//"splines/"+fdm_string+".dat";
 const std::string cdm_loop_lensing_path           = "data/lensing_spectrum/loop/"+ cdm_string + ".dat";
-const std::string fdm_loop_lensing_paths[3]        = {"data/lensing_spectrum/loop/"+fdm_strings[0]+".dat", "data/lensing_spectrum/loop/"+fdm_strings[1]+".dat", "data/lensing_spectrum/loop/"+fdm_strings[2]+".dat"};
+const std::string fdm_loop_lensing_paths[3]       = {"data/lensing_spectrum/loop/"+fdm_strings[0]+".dat", "data/lensing_spectrum/loop/"+fdm_strings[1]+".dat", "data/lensing_spectrum/loop/"+fdm_strings[2]+".dat"};
 //const std::string loop_difference_lensing_path  = "";//"data/lensing_spectrum/loop/"+fdm_string+"_diff.dat";
 
 

@@ -218,7 +218,7 @@ void computeLoopPowerSpectrum(const CosmoUtil &cu_l, const CosmoUtil &cu_nl, con
 
     std::vector<double> x(n), y1(n), y2(n), y2_err(n), y2_Q(n);
     
-    x = pyLogspace(-3, 3, n);
+    x = pyLogspace(2, 3, n);
 
     for (size_t i = 0; i < n; ++i)
     {
@@ -666,7 +666,7 @@ void computeLoopSpectra(int fdm_mass_id)
 {
     // Use special constructor that initialises vegas integrator by running one integration with k0
     double k0 = 1e-4;
-    int N = 50;
+    int N = 5;
 
     #if 1
         cout << "Load CDM CAMB spectrum \n";
@@ -941,7 +941,7 @@ int main()
     #endif 
 
     //Loop power spectra
-    #if 1
+    #if 0
         computeLoopSpectra(i);
     #endif 
 

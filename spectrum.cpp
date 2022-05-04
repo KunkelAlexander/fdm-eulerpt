@@ -18,7 +18,7 @@
 #define LAST 4
 #define SEED 0
 #define MINEVAL 0
-#define MAXEVAL 10000
+#define MAXEVAL 10000000
 
 #define NSTART 1000
 #define NINCREASE 500
@@ -35,7 +35,7 @@
 #define KEY2 1
 #define KEY3 1
 #define MAXPASS 5
-#define BORDER 1e-4
+#define BORDER 1e-3
 #define MAXCHISQ 10.
 #define MINDEVIATION .25
 #define NGIVEN 0
@@ -161,8 +161,8 @@ Spline1D::Spline1D(const double *x, const double *y, size_t steps) : steps_(step
   spline_ = gsl_spline_alloc(gsl_interp_cspline, steps_);
   gsl_spline_init(spline_, x, y, steps_);
   #ifdef SPLINE_RANGE_CHECK
-  xmin_ = x[0];
-  xmax_ = x[steps-1];
+  xmin_ = x[0] + verysmalleps;
+  xmax_ = x[steps-1] - verysmalleps;
   #endif
 }
 
@@ -201,10 +201,10 @@ Spline2D::Spline2D(const double *x, const double *y, const double *z, size_t xsi
 
 
   #ifdef SPLINE_RANGE_CHECK
-  xmin_ = x[0];
-  xmax_ = x[xsize-1];
-  ymin_ = y[0];
-  ymax_ = y[ysize-1];
+  xmin_ = x[0] + verysmalleps;
+  xmax_ = x[xsize-1] - verysmalleps;
+  ymin_ = y[0] + verysmalleps;
+  ymax_ = y[ysize-1] - verysmalleps;
   #endif
 }
 
@@ -325,19 +325,6 @@ double dloghubble(double a)
 #else
   double da = 1e-8;
   result = (log(hubble(a + da)) - log(hubble(a - da))) / (2 * da);
-  // double aux, daux, p1, p2;
-  ///* radiation, matter and curvature */
-  // p1 = const_omega_m / gsl_pow_int(a, 3);
-  //
-  ///* dark energy , parameterised with eos w(a) = w0 + (1-a) * w' */
-  // aux = -(1.0 + const_w_dark_energy + const_w_dark_energy_prime) * log(a) + const_w_dark_energy_prime * (a - 1.0);
-  // p1 += const_omega_q * exp(3.0 * aux);
-  //
-  // p2   = -3 * const_omega_m / gsl_pow_int(a, 4);
-  // daux = -(1.0 + const_w_dark_energy + const_w_dark_energy_prime) / a + const_w_dark_energy_prime;
-  // p2  += const_omega_q * exp(3.0 * aux) * 3 * daux;
-  //
-  // result = 0.5 * p2/p1;
 #endif
   return (result);
 }
@@ -351,76 +338,6 @@ double d2loghubble(double a)
   return (result);
 }
 
-/* --- function cdm_transfer [Bardeen - CDM transfer function] --- */
-double BardeenSpectrum::transfer_function(double k)
-{
-  double result, q, shape, fb, aux;
-  double alpha = 2.34, beta = 3.89, gamma = 16.1, delta = 5.46, epsilon = 6.71;
-
-  fb = const_omega_b / const_omega_m;
-  shape = const_omega_m * const_h_hubble * exp(-const_omega_b - sqrt(2.0 * const_h_hubble) * fb);
-  q = k / shape;
-
-  aux = 1.0 + beta * q + gsl_pow_int(gamma * q, 2) + gsl_pow_int(delta * q, 3) + gsl_pow_int(epsilon * q, 4);
-  result = gsl_sf_log(1.0 + alpha * q) / (alpha * q) * pow(aux, -1.0 / 4.0);
-
-  return (result);
-}
-
-double BardeenSpectrum::spectrum_aux(double k)
-{
-  return pow(k, n_s) * gsl_pow_int(BardeenSpectrum::transfer_function(k), 2);
-}
-
-/* --- function sigma8 --- */
-double BardeenSpectrum::sigma8()
-{
-  double result, aux, error;
-  gsl_integration_workspace *w = gsl_integration_workspace_alloc(NEVAL);
-  gsl_function F;
-
-  F.function = &BardeenSpectrum::aux_dsigma8;
-  F.params = NULL;
-
-  gsl_integration_qagiu(&F, 0.0, 0.0, smalleps, NEVAL, w, &aux, &error);
-  result = sqrt(aux / 2.0 / M_PI / M_PI);
-
-  gsl_integration_workspace_free(w);
-
-  return (result);
-}
-
-/* --- function aux_dsigma8 --- */
-double BardeenSpectrum::aux_dsigma8(double k, void *params)
-{
-  double result, window, aux;
-
-  aux = const_rsmooth * k;
-  window = 3.0 * gsl_sf_bessel_j1(aux) / aux;
-  result = BardeenSpectrum::spectrum_aux(k) * gsl_pow_int(k * window, 2);
-
-  return (result);
-}
-
-BardeenSpectrum::BardeenSpectrum()
-{
-  anorm = const_sigma8 / sigma8();
-  d0 = CDM::d_plus(const_a_in, 1);
-}
-
-double BardeenSpectrum::P0(double k) const
-{
-#ifdef FDM_TEST_COSMOLOGY
-  return A_fit * pow(k, n_s_fit) / (1 + pow(k / B_fit, C_fit) + (pow(k, E_fit) + pow(k, F_fit)) / D_fit);
-#else
-  return pow(k, n_s) * gsl_pow_int(anorm * BardeenSpectrum::transfer_function(k), 2) * pow(d0, 2);
-#endif
-}
-
-double BardeenSpectrum::operator()(double k, const CosmoUtil &cu) const
-{
-  return pow(k, n_s) * gsl_pow_int(anorm * BardeenSpectrum::transfer_function(k), 2);
-}
 
 SplineSpectrum::SplineSpectrum(const std::string &filename)
 {
@@ -604,14 +521,10 @@ double CAMBSpectrum::P0(double k) const
 {
   if ((k > kmin) && (k < kmax))
     return (*s)(k);
-
-  if (k <= kmin)
+  else if (k <= kmin)
     return coeffl * pow(k, alphal);
-
-  if (k >= kmax)
+  else
     return coeffh * pow(k, alphah);
-
-  return 0;
 }
 
 double CAMBSpectrum::operator()(double k, const CosmoUtil &cu) const
@@ -824,7 +737,7 @@ namespace CDM
 
   double D_spline::operator()(double a)
   {
-    if (a < amin_ || a > amax_)
+    if (a < amin_ + verysmalleps || a > amax_ - verysmalleps)
     {
       throw std::runtime_error("Value of a in D_spline out of range with a_min = " + std::to_string(amin_) + " amax = " + std::to_string(amax_) + " a = " + std::to_string(a));
     }
@@ -929,6 +842,115 @@ namespace CDM
     return (810 * alpha(k1, k2) * alpha(k1 + k2, k3 + k4) * alpha(k3, k4) + 810 * alpha(k2, k1) * alpha(k1 + k2, k3 + k4) * alpha(k3, k4) + 735 * alpha(k1, k4) * alpha(k2, k1 + k3 + k4) * alpha(k3, k1 + k4) + 735 * alpha(k1, k2 + k4) * alpha(k2, k4) * alpha(k3, k1 + k2 + k4) + 735 * alpha(k1, k4) * alpha(k2, k1 + k4) * alpha(k3, k1 + k2 + k4) + 441 * alpha(k1, k2) * alpha(k1 + k2, k4) * alpha(k3, k1 + k2 + k4) + 441 * alpha(k2, k1) * alpha(k1 + k2, k4) * alpha(k3, k1 + k2 + k4) + 441 * alpha(k1, k3) * alpha(k2, k1 + k3 + k4) * alpha(k1 + k3, k4) + 441 * alpha(k2, k1 + k3 + k4) * alpha(k3, k1) * alpha(k1 + k3, k4) + 810 * alpha(k1, k3) * alpha(k2, k4) * alpha(k1 + k3, k2 + k4) + 810 * alpha(k2, k4) * alpha(k3, k1) * alpha(k1 + k3, k2 + k4) + 810 * alpha(k1, k4) * alpha(k2, k3) * alpha(k2 + k3, k1 + k4) + 810 * alpha(k1, k4) * alpha(k3, k2) * alpha(k2 + k3, k1 + k4) + 315 * alpha(k1, k2 + k3) * alpha(k2, k3) * alpha(k1 + k2 + k3, k4) + 315 * alpha(k1, k3) * alpha(k2, k1 + k3) * alpha(k1 + k2 + k3, k4) + 189 * alpha(k1, k2) * alpha(k1 + k2, k3) * alpha(k1 + k2 + k3, k4) + 189 * alpha(k2, k1) * alpha(k1 + k2, k3) * alpha(k1 + k2 + k3, k4) + 315 * alpha(k2, k1 + k3) * alpha(k3, k1) * alpha(k1 + k2 + k3, k4) + 315 * alpha(k1, k2 + k3) * alpha(k3, k2) * alpha(k1 + k2 + k3, k4) + 315 * alpha(k1, k2) * alpha(k3, k1 + k2) * alpha(k1 + k2 + k3, k4) + 315 * alpha(k2, k1) * alpha(k3, k1 + k2) * alpha(k1 + k2 + k3, k4) + 189 * alpha(k1, k3) * alpha(k1 + k3, k2) * alpha(k1 + k2 + k3, k4) + 189 * alpha(k3, k1) * alpha(k1 + k3, k2) * alpha(k1 + k2 + k3, k4) + 189 * alpha(k2, k3) * alpha(k2 + k3, k1) * alpha(k1 + k2 + k3, k4) + 189 * alpha(k3, k2) * alpha(k2 + k3, k1) * alpha(k1 + k2 + k3, k4) + 735 * alpha(k2, k1 + k3 + k4) * alpha(k3, k1 + k4) * alpha(k4, k1) + 735 * alpha(k2, k1 + k4) * alpha(k3, k1 + k2 + k4) * alpha(k4, k1) + 810 * alpha(k2, k3) * alpha(k2 + k3, k1 + k4) * alpha(k4, k1) + 810 * alpha(k3, k2) * alpha(k2 + k3, k1 + k4) * alpha(k4, k1) + 735 * alpha(k1, k2 + k4) * alpha(k3, k1 + k2 + k4) * alpha(k4, k2) + 810 * alpha(k1, k3) * alpha(k1 + k3, k2 + k4) * alpha(k4, k2) + 810 * alpha(k3, k1) * alpha(k1 + k3, k2 + k4) * alpha(k4, k2) + 735 * alpha(k1, k2) * alpha(k3, k1 + k2 + k4) * alpha(k4, k1 + k2) + 735 * alpha(k2, k1) * alpha(k3, k1 + k2 + k4) * alpha(k4, k1 + k2) + 810 * alpha(k1, k2) * alpha(k1 + k2, k3 + k4) * alpha(k4, k3) + 810 * alpha(k2, k1) * alpha(k1 + k2, k3 + k4) * alpha(k4, k3) + 735 * alpha(k1, k3) * alpha(k2, k1 + k3 + k4) * alpha(k4, k1 + k3) + 735 * alpha(k2, k1 + k3 + k4) * alpha(k3, k1) * alpha(k4, k1 + k3) + 735 * alpha(k1, k2 + k3) * alpha(k2, k3) * alpha(k4, k1 + k2 + k3) + 735 * alpha(k1, k3) * alpha(k2, k1 + k3) * alpha(k4, k1 + k2 + k3) + 441 * alpha(k1, k2) * alpha(k1 + k2, k3) * alpha(k4, k1 + k2 + k3) + 441 * alpha(k2, k1) * alpha(k1 + k2, k3) * alpha(k4, k1 + k2 + k3) + 735 * alpha(k2, k1 + k3) * alpha(k3, k1) * alpha(k4, k1 + k2 + k3) + 735 * alpha(k1, k2 + k3) * alpha(k3, k2) * alpha(k4, k1 + k2 + k3) + 735 * alpha(k1, k2) * alpha(k3, k1 + k2) * alpha(k4, k1 + k2 + k3) + 735 * alpha(k2, k1) * alpha(k3, k1 + k2) * alpha(k4, k1 + k2 + k3) + 441 * alpha(k1, k3) * alpha(k1 + k3, k2) * alpha(k4, k1 + k2 + k3) + 441 * alpha(k3, k1) * alpha(k1 + k3, k2) * alpha(k4, k1 + k2 + k3) + 441 * alpha(k2, k3) * alpha(k2 + k3, k1) * alpha(k4, k1 + k2 + k3) + 441 * alpha(k3, k2) * alpha(k2 + k3, k1) * alpha(k4, k1 + k2 + k3) + 441 * alpha(k1, k4) * alpha(k3, k1 + k2 + k4) * alpha(k1 + k4, k2) + 441 * alpha(k3, k1 + k2 + k4) * alpha(k4, k1) * alpha(k1 + k4, k2) + 441 * alpha(k1, k4) * alpha(k2, k1 + k3 + k4) * alpha(k1 + k4, k3) + 441 * alpha(k2, k1 + k3 + k4) * alpha(k4, k1) * alpha(k1 + k4, k3) + 810 * alpha(k1, k4) * alpha(k2, k3) * alpha(k1 + k4, k2 + k3) + 810 * alpha(k1, k4) * alpha(k3, k2) * alpha(k1 + k4, k2 + k3) + 810 * alpha(k2, k3) * alpha(k4, k1) * alpha(k1 + k4, k2 + k3) + 810 * alpha(k3, k2) * alpha(k4, k1) * alpha(k1 + k4, k2 + k3) + 441 * alpha(k2, k4) * alpha(k3, k1 + k2 + k4) * alpha(k2 + k4, k1) + 441 * alpha(k3, k1 + k2 + k4) * alpha(k4, k2) * alpha(k2 + k4, k1) + 810 * alpha(k1, k3) * alpha(k2, k4) * alpha(k2 + k4, k1 + k3) + 810 * alpha(k2, k4) * alpha(k3, k1) * alpha(k2 + k4, k1 + k3) + 810 * alpha(k1, k3) * alpha(k4, k2) * alpha(k2 + k4, k1 + k3) + 810 * alpha(k3, k1) * alpha(k4, k2) * alpha(k2 + k4, k1 + k3) + 315 * alpha(k1, k2 + k4) * alpha(k2, k4) * alpha(k1 + k2 + k4, k3) + 315 * alpha(k1, k4) * alpha(k2, k1 + k4) * alpha(k1 + k2 + k4, k3) + 189 * alpha(k1, k2) * alpha(k1 + k2, k4) * alpha(k1 + k2 + k4, k3) + 189 * alpha(k2, k1) * alpha(k1 + k2, k4) * alpha(k1 + k2 + k4, k3) + 315 * alpha(k2, k1 + k4) * alpha(k4, k1) * alpha(k1 + k2 + k4, k3) + 315 * alpha(k1, k2 + k4) * alpha(k4, k2) * alpha(k1 + k2 + k4, k3) + 315 * alpha(k1, k2) * alpha(k4, k1 + k2) * alpha(k1 + k2 + k4, k3) + 315 * alpha(k2, k1) * alpha(k4, k1 + k2) * alpha(k1 + k2 + k4, k3) + 189 * alpha(k1, k4) * alpha(k1 + k4, k2) * alpha(k1 + k2 + k4, k3) + 189 * alpha(k4, k1) * alpha(k1 + k4, k2) * alpha(k1 + k2 + k4, k3) + 189 * alpha(k2, k4) * alpha(k2 + k4, k1) * alpha(k1 + k2 + k4, k3) + 189 * alpha(k4, k2) * alpha(k2 + k4, k1) * alpha(k1 + k2 + k4, k3) + 441 * alpha(k2, k1 + k3 + k4) * alpha(k3, k4) * alpha(k3 + k4, k1) + 441 * alpha(k2, k1 + k3 + k4) * alpha(k4, k3) * alpha(k3 + k4, k1) + 810 * alpha(k1, k2) * alpha(k3, k4) * alpha(k3 + k4, k1 + k2) + 810 * alpha(k2, k1) * alpha(k3, k4) * alpha(k3 + k4, k1 + k2) + 810 * alpha(k1, k2) * alpha(k4, k3) * alpha(k3 + k4, k1 + k2) + 810 * alpha(k2, k1) * alpha(k4, k3) * alpha(k3 + k4, k1 + k2) + 315 * alpha(k1, k4) * alpha(k3, k1 + k4) * alpha(k1 + k3 + k4, k2) + 189 * alpha(k1, k3) * alpha(k1 + k3, k4) * alpha(k1 + k3 + k4, k2) + 189 * alpha(k3, k1) * alpha(k1 + k3, k4) * alpha(k1 + k3 + k4, k2) + 315 * alpha(k3, k1 + k4) * alpha(k4, k1) * alpha(k1 + k3 + k4, k2) + 315 * alpha(k1, k3) * alpha(k4, k1 + k3) * alpha(k1 + k3 + k4, k2) + 315 * alpha(k3, k1) * alpha(k4, k1 + k3) * alpha(k1 + k3 + k4, k2) + 189 * alpha(k1, k4) * alpha(k1 + k4, k3) * alpha(k1 + k3 + k4, k2) + 189 * alpha(k4, k1) * alpha(k1 + k4, k3) * alpha(k1 + k3 + k4, k2) + 189 * alpha(k3, k4) * alpha(k3 + k4, k1) * alpha(k1 + k3 + k4, k2) + 189 * alpha(k4, k3) * alpha(k3 + k4, k1) * alpha(k1 + k3 + k4, k2) + 315 * alpha(k2, k3 + k4) * alpha(k3, k4) * alpha(k2 + k3 + k4, k1) + 315 * alpha(k2, k4) * alpha(k3, k2 + k4) * alpha(k2 + k3 + k4, k1) + 189 * alpha(k2, k3) * alpha(k2 + k3, k4) * alpha(k2 + k3 + k4, k1) + 189 * alpha(k3, k2) * alpha(k2 + k3, k4) * alpha(k2 + k3 + k4, k1) + 315 * alpha(k3, k2 + k4) * alpha(k4, k2) * alpha(k2 + k3 + k4, k1) + 315 * alpha(k2, k3 + k4) * alpha(k4, k3) * alpha(k2 + k3 + k4, k1) + 315 * alpha(k2, k3) * alpha(k4, k2 + k3) * alpha(k2 + k3 + k4, k1) + 315 * alpha(k3, k2) * alpha(k4, k2 + k3) * alpha(k2 + k3 + k4, k1) + 189 * alpha(k2, k4) * alpha(k2 + k4, k3) * alpha(k2 + k3 + k4, k1) + 189 * alpha(k4, k2) * alpha(k2 + k4, k3) * alpha(k2 + k3 + k4, k1) + 189 * alpha(k3, k4) * alpha(k3 + k4, k2) * alpha(k2 + k3 + k4, k1) + 189 * alpha(k4, k3) * alpha(k3 + k4, k2) * alpha(k2 + k3 + k4, k1) + 2160 * alpha(k1 + k2, k3 + k4) * alpha(k3, k4) * beta(k1, k2) + 1176 * alpha(k1 + k2, k4) * alpha(k3, k1 + k2 + k4) * beta(k1, k2) + 504 * alpha(k1 + k2, k3) * alpha(k1 + k2 + k3, k4) * beta(k1, k2) + 252 * alpha(k3, k1 + k2) * alpha(k1 + k2 + k3, k4) * beta(k1, k2) + 588 * alpha(k3, k1 + k2 + k4) * alpha(k4, k1 + k2) * beta(k1, k2) + 2160 * alpha(k1 + k2, k3 + k4) * alpha(k4, k3) * beta(k1, k2) + 1176 * alpha(k1 + k2, k3) * alpha(k4, k1 + k2 + k3) * beta(k1, k2) + 588 * alpha(k3, k1 + k2) * alpha(k4, k1 + k2 + k3) * beta(k1, k2) + 504 * alpha(k1 + k2, k4) * alpha(k1 + k2 + k4, k3) * beta(k1, k2) + 252 * alpha(k4, k1 + k2) * alpha(k1 + k2 + k4, k3) * beta(k1, k2) + 648 * alpha(k3, k4) * alpha(k3 + k4, k1 + k2) * beta(k1, k2) + 648 * alpha(k4, k3) * alpha(k3 + k4, k1 + k2) * beta(k1, k2) + 1176 * alpha(k2, k1 + k3 + k4) * alpha(k1 + k3, k4) * beta(k1, k3) + 2160 * alpha(k2, k4) * alpha(k1 + k3, k2 + k4) * beta(k1, k3) + 252 * alpha(k2, k1 + k3) * alpha(k1 + k2 + k3, k4) * beta(k1, k3) + 504 * alpha(k1 + k3, k2) * alpha(k1 + k2 + k3, k4) * beta(k1, k3) + 2160 * alpha(k1 + k3, k2 + k4) * alpha(k4, k2) * beta(k1, k3) + 588 * alpha(k2, k1 + k3 + k4) * alpha(k4, k1 + k3) * beta(k1, k3) + 588 * alpha(k2, k1 + k3) * alpha(k4, k1 + k2 + k3) * beta(k1, k3) + 1176 * alpha(k1 + k3, k2) * alpha(k4, k1 + k2 + k3) * beta(k1, k3) + 648 * alpha(k2, k4) * alpha(k2 + k4, k1 + k3) * beta(k1, k3) + 648 * alpha(k4, k2) * alpha(k2 + k4, k1 + k3) * beta(k1, k3) + 504 * alpha(k1 + k3, k4) * alpha(k1 + k3 + k4, k2) * beta(k1, k3) + 252 * alpha(k4, k1 + k3) * alpha(k1 + k3 + k4, k2) * beta(k1, k3) + 756 * alpha(k2, k3) * alpha(k1 + k2 + k3, k4) * beta(k1, k2 + k3) + 756 * alpha(k3, k2) * alpha(k1 + k2 + k3, k4) * beta(k1, k2 + k3) + 252 * alpha(k2, k3) * alpha(k4, k1 + k2 + k3) * beta(k1, k2 + k3) + 252 * alpha(k3, k2) * alpha(k4, k1 + k2 + k3) * beta(k1, k2 + k3) + 588 * alpha(k2, k1 + k3 + k4) * alpha(k3, k1 + k4) * beta(k1, k4) + 588 * alpha(k2, k1 + k4) * alpha(k3, k1 + k2 + k4) * beta(k1, k4) + 648 * alpha(k2, k3) * alpha(k2 + k3, k1 + k4) * beta(k1, k4) + 648 * alpha(k3, k2) * alpha(k2 + k3, k1 + k4) * beta(k1, k4) + 1176 * alpha(k3, k1 + k2 + k4) * alpha(k1 + k4, k2) * beta(k1, k4) + 1176 * alpha(k2, k1 + k3 + k4) * alpha(k1 + k4, k3) * beta(k1, k4) + 2160 * alpha(k2, k3) * alpha(k1 + k4, k2 + k3) * beta(k1, k4) + 2160 * alpha(k3, k2) * alpha(k1 + k4, k2 + k3) * beta(k1, k4) + 252 * alpha(k2, k1 + k4) * alpha(k1 + k2 + k4, k3) * beta(k1, k4) + 504 * alpha(k1 + k4, k2) * alpha(k1 + k2 + k4, k3) * beta(k1, k4) + 252 * alpha(k3, k1 + k4) * alpha(k1 + k3 + k4, k2) * beta(k1, k4) + 504 * alpha(k1 + k4, k3) * alpha(k1 + k3 + k4, k2) * beta(k1, k4) + 252 * alpha(k2, k4) * alpha(k3, k1 + k2 + k4) * beta(k1, k2 + k4) + 252 * alpha(k3, k1 + k2 + k4) * alpha(k4, k2) * beta(k1, k2 + k4) + 756 * alpha(k2, k4) * alpha(k1 + k2 + k4, k3) * beta(k1, k2 + k4) + 756 * alpha(k4, k2) * alpha(k1 + k2 + k4, k3) * beta(k1, k2 + k4) + 252 * alpha(k2, k1 + k3 + k4) * alpha(k3, k4) * beta(k1, k3 + k4) + 252 * alpha(k2, k1 + k3 + k4) * alpha(k4, k3) * beta(k1, k3 + k4) + 756 * alpha(k3, k4) * alpha(k1 + k3 + k4, k2) * beta(k1, k3 + k4) + 756 * alpha(k4, k3) * alpha(k1 + k3 + k4, k2) * beta(k1, k3 + k4) + 140 * alpha(k2, k3 + k4) * alpha(k3, k4) * beta(k1, k2 + k3 + k4) + 140 * alpha(k2, k4) * alpha(k3, k2 + k4) * beta(k1, k2 + k3 + k4) + 84 * alpha(k2, k3) * alpha(k2 + k3, k4) * beta(k1, k2 + k3 + k4) + 84 * alpha(k3, k2) * alpha(k2 + k3, k4) * beta(k1, k2 + k3 + k4) + 140 * alpha(k3, k2 + k4) * alpha(k4, k2) * beta(k1, k2 + k3 + k4) + 140 * alpha(k2, k3 + k4) * alpha(k4, k3) * beta(k1, k2 + k3 + k4) + 140 * alpha(k2, k3) * alpha(k4, k2 + k3) * beta(k1, k2 + k3 + k4) + 140 * alpha(k3, k2) * alpha(k4, k2 + k3) * beta(k1, k2 + k3 + k4) + 84 * alpha(k2, k4) * alpha(k2 + k4, k3) * beta(k1, k2 + k3 + k4) + 84 * alpha(k4, k2) * alpha(k2 + k4, k3) * beta(k1, k2 + k3 + k4) + 84 * alpha(k3, k4) * alpha(k3 + k4, k2) * beta(k1, k2 + k3 + k4) + 84 * alpha(k4, k3) * alpha(k3 + k4, k2) * beta(k1, k2 + k3 + k4) + 2160 * alpha(k1, k4) * alpha(k2 + k3, k1 + k4) * beta(k2, k3) + 252 * alpha(k1, k2 + k3) * alpha(k1 + k2 + k3, k4) * beta(k2, k3) + 504 * alpha(k2 + k3, k1) * alpha(k1 + k2 + k3, k4) * beta(k2, k3) + 2160 * alpha(k2 + k3, k1 + k4) * alpha(k4, k1) * beta(k2, k3) + 588 * alpha(k1, k2 + k3) * alpha(k4, k1 + k2 + k3) * beta(k2, k3) + 1176 * alpha(k2 + k3, k1) * alpha(k4, k1 + k2 + k3) * beta(k2, k3) + 648 * alpha(k1, k4) * alpha(k1 + k4, k2 + k3) * beta(k2, k3) + 648 * alpha(k4, k1) * alpha(k1 + k4, k2 + k3) * beta(k2, k3) + 504 * alpha(k2 + k3, k4) * alpha(k2 + k3 + k4, k1) * beta(k2, k3) + 252 * alpha(k4, k2 + k3) * alpha(k2 + k3 + k4, k1) * beta(k2, k3) + 2016 * alpha(k1 + k2 + k3, k4) * beta(k1, k2 + k3) * beta(k2, k3) + 672 * alpha(k4, k1 + k2 + k3) * beta(k1, k2 + k3) * beta(k2, k3) + 1728 * alpha(k2 + k3, k1 + k4) * beta(k1, k4) * beta(k2, k3) + 1728 * alpha(k1 + k4, k2 + k3) * beta(k1, k4) * beta(k2, k3) + 224 * alpha(k2 + k3, k4) * beta(k1, k2 + k3 + k4) * beta(k2, k3) + 112 * alpha(k4, k2 + k3) * beta(k1, k2 + k3 + k4) * beta(k2, k3) + 756 * alpha(k1, k3) * alpha(k1 + k2 + k3, k4) * beta(k2, k1 + k3) + 756 * alpha(k3, k1) * alpha(k1 + k2 + k3, k4) * beta(k2, k1 + k3) + 252 * alpha(k1, k3) * alpha(k4, k1 + k2 + k3) * beta(k2, k1 + k3) + 252 * alpha(k3, k1) * alpha(k4, k1 + k2 + k3) * beta(k2, k1 + k3) + 2016 * alpha(k1 + k2 + k3, k4) * beta(k1, k3) * beta(k2, k1 + k3) + 672 * alpha(k4, k1 + k2 + k3) * beta(k1, k3) * beta(k2, k1 + k3) + 588 * alpha(k1, k2 + k4) * alpha(k3, k1 + k2 + k4) * beta(k2, k4) + 648 * alpha(k1, k3) * alpha(k1 + k3, k2 + k4) * beta(k2, k4) + 648 * alpha(k3, k1) * alpha(k1 + k3, k2 + k4) * beta(k2, k4) + 1176 * alpha(k3, k1 + k2 + k4) * alpha(k2 + k4, k1) * beta(k2, k4) + 2160 * alpha(k1, k3) * alpha(k2 + k4, k1 + k3) * beta(k2, k4) + 2160 * alpha(k3, k1) * alpha(k2 + k4, k1 + k3) * beta(k2, k4) + 252 * alpha(k1, k2 + k4) * alpha(k1 + k2 + k4, k3) * beta(k2, k4) + 504 * alpha(k2 + k4, k1) * alpha(k1 + k2 + k4, k3) * beta(k2, k4) + 252 * alpha(k3, k2 + k4) * alpha(k2 + k3 + k4, k1) * beta(k2, k4) + 504 * alpha(k2 + k4, k3) * alpha(k2 + k3 + k4, k1) * beta(k2, k4) + 1728 * alpha(k1 + k3, k2 + k4) * beta(k1, k3) * beta(k2, k4) + 1728 * alpha(k2 + k4, k1 + k3) * beta(k1, k3) * beta(k2, k4) + 672 * alpha(k3, k1 + k2 + k4) * beta(k1, k2 + k4) * beta(k2, k4) + 2016 * alpha(k1 + k2 + k4, k3) * beta(k1, k2 + k4) * beta(k2, k4) + 112 * alpha(k3, k2 + k4) * beta(k1, k2 + k3 + k4) * beta(k2, k4) + 224 * alpha(k2 + k4, k3) * beta(k1, k2 + k3 + k4) * beta(k2, k4) + 252 * alpha(k1, k4) * alpha(k3, k1 + k2 + k4) * beta(k2, k1 + k4) + 252 * alpha(k3, k1 + k2 + k4) * alpha(k4, k1) * beta(k2, k1 + k4) + 756 * alpha(k1, k4) * alpha(k1 + k2 + k4, k3) * beta(k2, k1 + k4) + 756 * alpha(k4, k1) * alpha(k1 + k2 + k4, k3) * beta(k2, k1 + k4) + 672 * alpha(k3, k1 + k2 + k4) * beta(k1, k4) * beta(k2, k1 + k4) + 2016 * alpha(k1 + k2 + k4, k3) * beta(k1, k4) * beta(k2, k1 + k4) + 756 * alpha(k3, k4) * alpha(k2 + k3 + k4, k1) * beta(k2, k3 + k4) + 756 * alpha(k4, k3) * alpha(k2 + k3 + k4, k1) * beta(k2, k3 + k4) + 336 * alpha(k3, k4) * beta(k1, k2 + k3 + k4) * beta(k2, k3 + k4) + 336 * alpha(k4, k3) * beta(k1, k2 + k3 + k4) * beta(k2, k3 + k4) + 140 * alpha(k1, k4) * alpha(k3, k1 + k4) * beta(k2, k1 + k3 + k4) + 84 * alpha(k1, k3) * alpha(k1 + k3, k4) * beta(k2, k1 + k3 + k4) + 84 * alpha(k3, k1) * alpha(k1 + k3, k4) * beta(k2, k1 + k3 + k4) + 140 * alpha(k3, k1 + k4) * alpha(k4, k1) * beta(k2, k1 + k3 + k4) + 140 * alpha(k1, k3) * alpha(k4, k1 + k3) * beta(k2, k1 + k3 + k4) + 140 * alpha(k3, k1) * alpha(k4, k1 + k3) * beta(k2, k1 + k3 + k4) + 84 * alpha(k1, k4) * alpha(k1 + k4, k3) * beta(k2, k1 + k3 + k4) + 84 * alpha(k4, k1) * alpha(k1 + k4, k3) * beta(k2, k1 + k3 + k4) + 84 * alpha(k3, k4) * alpha(k3 + k4, k1) * beta(k2, k1 + k3 + k4) + 84 * alpha(k4, k3) * alpha(k3 + k4, k1) * beta(k2, k1 + k3 + k4) + 224 * alpha(k1 + k3, k4) * beta(k1, k3) * beta(k2, k1 + k3 + k4) + 112 * alpha(k4, k1 + k3) * beta(k1, k3) * beta(k2, k1 + k3 + k4) + 112 * alpha(k3, k1 + k4) * beta(k1, k4) * beta(k2, k1 + k3 + k4) + 224 * alpha(k1 + k4, k3) * beta(k1, k4) * beta(k2, k1 + k3 + k4) + 336 * alpha(k3, k4) * beta(k1, k3 + k4) * beta(k2, k1 + k3 + k4) + 336 * alpha(k4, k3) * beta(k1, k3 + k4) * beta(k2, k1 + k3 + k4) + 756 * alpha(k1, k2) * alpha(k1 + k2 + k3, k4) * beta(k1 + k2, k3) + 756 * alpha(k2, k1) * alpha(k1 + k2 + k3, k4) * beta(k1 + k2, k3) + 252 * alpha(k1, k2) * alpha(k4, k1 + k2 + k3) * beta(k1 + k2, k3) + 252 * alpha(k2, k1) * alpha(k4, k1 + k2 + k3) * beta(k1 + k2, k3) + 2016 * alpha(k1 + k2 + k3, k4) * beta(k1, k2) * beta(k1 + k2, k3) + 672 * alpha(k4, k1 + k2 + k3) * beta(k1, k2) * beta(k1 + k2, k3) + 252 * alpha(k1, k2) * alpha(k3, k1 + k2 + k4) * beta(k1 + k2, k4) + 252 * alpha(k2, k1) * alpha(k3, k1 + k2 + k4) * beta(k1 + k2, k4) + 756 * alpha(k1, k2) * alpha(k1 + k2 + k4, k3) * beta(k1 + k2, k4) + 756 * alpha(k2, k1) * alpha(k1 + k2 + k4, k3) * beta(k1 + k2, k4) + 672 * alpha(k3, k1 + k2 + k4) * beta(k1, k2) * beta(k1 + k2, k4) + 2016 * alpha(k1 + k2 + k4, k3) * beta(k1, k2) * beta(k1 + k2, k4) + 216 * alpha(k1, k2) * alpha(k3, k4) * beta(k1 + k2, k3 + k4) + 216 * alpha(k2, k1) * alpha(k3, k4) * beta(k1 + k2, k3 + k4) + 216 * alpha(k1, k2) * alpha(k4, k3) * beta(k1 + k2, k3 + k4) + 216 * alpha(k2, k1) * alpha(k4, k3) * beta(k1 + k2, k3 + k4) + 576 * alpha(k3, k4) * beta(k1, k2) * beta(k1 + k2, k3 + k4) + 576 * alpha(k4, k3) * beta(k1, k2) * beta(k1 + k2, k3 + k4) + 648 * alpha(k1, k2) * alpha(k1 + k2, k3 + k4) * beta(k3, k4) + 648 * alpha(k2, k1) * alpha(k1 + k2, k3 + k4) * beta(k3, k4) + 1176 * alpha(k2, k1 + k3 + k4) * alpha(k3 + k4, k1) * beta(k3, k4) + 2160 * alpha(k1, k2) * alpha(k3 + k4, k1 + k2) * beta(k3, k4) + 2160 * alpha(k2, k1) * alpha(k3 + k4, k1 + k2) * beta(k3, k4) + 504 * alpha(k3 + k4, k1) * alpha(k1 + k3 + k4, k2) * beta(k3, k4) + 252 * alpha(k2, k3 + k4) * alpha(k2 + k3 + k4, k1) * beta(k3, k4) + 504 * alpha(k3 + k4, k2) * alpha(k2 + k3 + k4, k1) * beta(k3, k4) + 1728 * alpha(k1 + k2, k3 + k4) * beta(k1, k2) * beta(k3, k4) + 1728 * alpha(k3 + k4, k1 + k2) * beta(k1, k2) * beta(k3, k4) + 672 * alpha(k2, k1 + k3 + k4) * beta(k1, k3 + k4) * beta(k3, k4) + 2016 * alpha(k1 + k3 + k4, k2) * beta(k1, k3 + k4) * beta(k3, k4) + 112 * alpha(k2, k3 + k4) * beta(k1, k2 + k3 + k4) * beta(k3, k4) + 224 * alpha(k3 + k4, k2) * beta(k1, k2 + k3 + k4) * beta(k3, k4) + 2016 * alpha(k2 + k3 + k4, k1) * beta(k2, k3 + k4) * beta(k3, k4) + 896 * beta(k1, k2 + k3 + k4) * beta(k2, k3 + k4) * beta(k3, k4) + 224 * alpha(k3 + k4, k1) * beta(k2, k1 + k3 + k4) * beta(k3, k4) + 896 * beta(k1, k3 + k4) * beta(k2, k1 + k3 + k4) * beta(k3, k4) + 576 * alpha(k1, k2) * beta(k1 + k2, k3 + k4) * beta(k3, k4) + 576 * alpha(k2, k1) * beta(k1 + k2, k3 + k4) * beta(k3, k4) + 1536 * beta(k1, k2) * beta(k1 + k2, k3 + k4) * beta(k3, k4) + 7 * alpha(k1, k3 + k4) * (21 * alpha(k2, k1 + k3 + k4) + 9 * alpha(k1 + k3 + k4, k2) + 4 * beta(k2, k1 + k3 + k4)) * (5 * alpha(k3, k4) + 5 * alpha(k4, k3) + 4 * beta(k3, k4)) + 252 * alpha(k1, k4) * alpha(k2, k1 + k3 + k4) * beta(k3, k1 + k4) + 252 * alpha(k2, k1 + k3 + k4) * alpha(k4, k1) * beta(k3, k1 + k4) + 756 * alpha(k1, k4) * alpha(k1 + k3 + k4, k2) * beta(k3, k1 + k4) + 756 * alpha(k4, k1) * alpha(k1 + k3 + k4, k2) * beta(k3, k1 + k4) + 672 * alpha(k2, k1 + k3 + k4) * beta(k1, k4) * beta(k3, k1 + k4) + 2016 * alpha(k1 + k3 + k4, k2) * beta(k1, k4) * beta(k3, k1 + k4) + 336 * alpha(k1, k4) * beta(k2, k1 + k3 + k4) * beta(k3, k1 + k4) + 336 * alpha(k4, k1) * beta(k2, k1 + k3 + k4) * beta(k3, k1 + k4) + 896 * beta(k1, k4) * beta(k2, k1 + k3 + k4) * beta(k3, k1 + k4) + 756 * alpha(k2, k4) * alpha(k2 + k3 + k4, k1) * beta(k3, k2 + k4) + 756 * alpha(k4, k2) * alpha(k2 + k3 + k4, k1) * beta(k3, k2 + k4) + 336 * alpha(k2, k4) * beta(k1, k2 + k3 + k4) * beta(k3, k2 + k4) + 336 * alpha(k4, k2) * beta(k1, k2 + k3 + k4) * beta(k3, k2 + k4) + 2016 * alpha(k2 + k3 + k4, k1) * beta(k2, k4) * beta(k3, k2 + k4) + 896 * beta(k1, k2 + k3 + k4) * beta(k2, k4) * beta(k3, k2 + k4) + 140 * alpha(k1, k2 + k4) * alpha(k2, k4) * beta(k3, k1 + k2 + k4) + 140 * alpha(k1, k4) * alpha(k2, k1 + k4) * beta(k3, k1 + k2 + k4) + 84 * alpha(k1, k2) * alpha(k1 + k2, k4) * beta(k3, k1 + k2 + k4) + 84 * alpha(k2, k1) * alpha(k1 + k2, k4) * beta(k3, k1 + k2 + k4) + 140 * alpha(k2, k1 + k4) * alpha(k4, k1) * beta(k3, k1 + k2 + k4) + 140 * alpha(k1, k2 + k4) * alpha(k4, k2) * beta(k3, k1 + k2 + k4) + 140 * alpha(k1, k2) * alpha(k4, k1 + k2) * beta(k3, k1 + k2 + k4) + 140 * alpha(k2, k1) * alpha(k4, k1 + k2) * beta(k3, k1 + k2 + k4) + 84 * alpha(k1, k4) * alpha(k1 + k4, k2) * beta(k3, k1 + k2 + k4) + 84 * alpha(k4, k1) * alpha(k1 + k4, k2) * beta(k3, k1 + k2 + k4) + 84 * alpha(k2, k4) * alpha(k2 + k4, k1) * beta(k3, k1 + k2 + k4) + 84 * alpha(k4, k2) * alpha(k2 + k4, k1) * beta(k3, k1 + k2 + k4) + 224 * alpha(k1 + k2, k4) * beta(k1, k2) * beta(k3, k1 + k2 + k4) + 112 * alpha(k4, k1 + k2) * beta(k1, k2) * beta(k3, k1 + k2 + k4) + 112 * alpha(k2, k1 + k4) * beta(k1, k4) * beta(k3, k1 + k2 + k4) + 224 * alpha(k1 + k4, k2) * beta(k1, k4) * beta(k3, k1 + k2 + k4) + 336 * alpha(k2, k4) * beta(k1, k2 + k4) * beta(k3, k1 + k2 + k4) + 336 * alpha(k4, k2) * beta(k1, k2 + k4) * beta(k3, k1 + k2 + k4) + 112 * alpha(k1, k2 + k4) * beta(k2, k4) * beta(k3, k1 + k2 + k4) + 224 * alpha(k2 + k4, k1) * beta(k2, k4) * beta(k3, k1 + k2 + k4) + 896 * beta(k1, k2 + k4) * beta(k2, k4) * beta(k3, k1 + k2 + k4) + 336 * alpha(k1, k4) * beta(k2, k1 + k4) * beta(k3, k1 + k2 + k4) + 336 * alpha(k4, k1) * beta(k2, k1 + k4) * beta(k3, k1 + k2 + k4) + 896 * beta(k1, k4) * beta(k2, k1 + k4) * beta(k3, k1 + k2 + k4) + 336 * alpha(k1, k2) * beta(k1 + k2, k4) * beta(k3, k1 + k2 + k4) + 336 * alpha(k2, k1) * beta(k1 + k2, k4) * beta(k3, k1 + k2 + k4) + 896 * beta(k1, k2) * beta(k1 + k2, k4) * beta(k3, k1 + k2 + k4) + 252 * alpha(k1, k3) * alpha(k2, k1 + k3 + k4) * beta(k1 + k3, k4) + 252 * alpha(k2, k1 + k3 + k4) * alpha(k3, k1) * beta(k1 + k3, k4) + 756 * alpha(k1, k3) * alpha(k1 + k3 + k4, k2) * beta(k1 + k3, k4) + 756 * alpha(k3, k1) * alpha(k1 + k3 + k4, k2) * beta(k1 + k3, k4) + 672 * alpha(k2, k1 + k3 + k4) * beta(k1, k3) * beta(k1 + k3, k4) + 2016 * alpha(k1 + k3 + k4, k2) * beta(k1, k3) * beta(k1 + k3, k4) + 336 * alpha(k1, k3) * beta(k2, k1 + k3 + k4) * beta(k1 + k3, k4) + 336 * alpha(k3, k1) * beta(k2, k1 + k3 + k4) * beta(k1 + k3, k4) + 896 * beta(k1, k3) * beta(k2, k1 + k3 + k4) * beta(k1 + k3, k4) + 216 * alpha(k1, k3) * alpha(k2, k4) * beta(k1 + k3, k2 + k4) + 216 * alpha(k2, k4) * alpha(k3, k1) * beta(k1 + k3, k2 + k4) + 216 * alpha(k1, k3) * alpha(k4, k2) * beta(k1 + k3, k2 + k4) + 216 * alpha(k3, k1) * alpha(k4, k2) * beta(k1 + k3, k2 + k4) + 576 * alpha(k2, k4) * beta(k1, k3) * beta(k1 + k3, k2 + k4) + 576 * alpha(k4, k2) * beta(k1, k3) * beta(k1 + k3, k2 + k4) + 576 * alpha(k1, k3) * beta(k2, k4) * beta(k1 + k3, k2 + k4) + 576 * alpha(k3, k1) * beta(k2, k4) * beta(k1 + k3, k2 + k4) + 1536 * beta(k1, k3) * beta(k2, k4) * beta(k1 + k3, k2 + k4) + 756 * alpha(k2, k3) * alpha(k2 + k3 + k4, k1) * beta(k2 + k3, k4) + 756 * alpha(k3, k2) * alpha(k2 + k3 + k4, k1) * beta(k2 + k3, k4) + 336 * alpha(k2, k3) * beta(k1, k2 + k3 + k4) * beta(k2 + k3, k4) + 336 * alpha(k3, k2) * beta(k1, k2 + k3 + k4) * beta(k2 + k3, k4) + 2016 * alpha(k2 + k3 + k4, k1) * beta(k2, k3) * beta(k2 + k3, k4) + 896 * beta(k1, k2 + k3 + k4) * beta(k2, k3) * beta(k2 + k3, k4) + 21 * alpha(k1, k2 + k3 + k4) * (21 * alpha(k2, k3) * alpha(k2 + k3, k4) + 21 * alpha(k3, k2) * alpha(k2 + k3, k4) + 35 * alpha(k3, k2 + k4) * alpha(k4, k2) + 35 * alpha(k2, k3) * alpha(k4, k2 + k3) + 35 * alpha(k3, k2) * alpha(k4, k2 + k3) + 21 * alpha(k4, k2) * alpha(k2 + k4, k3) + 21 * alpha(k3, k4) * alpha(k3 + k4, k2) + 21 * alpha(k4, k3) * alpha(k3 + k4, k2) + 56 * alpha(k2 + k3, k4) * beta(k2, k3) + 28 * alpha(k4, k2 + k3) * beta(k2, k3) + 28 * alpha(k3, k2 + k4) * beta(k2, k4) + 56 * alpha(k2 + k4, k3) * beta(k2, k4) + 12 * alpha(k3, k4) * beta(k2, k3 + k4) + 12 * alpha(k4, k3) * beta(k2, k3 + k4) + 56 * alpha(k3 + k4, k2) * beta(k3, k4) + 32 * beta(k2, k3 + k4) * beta(k3, k4) + 7 * alpha(k2, k3 + k4) * (5 * alpha(k3, k4) + 5 * alpha(k4, k3) + 4 * beta(k3, k4)) + 12 * alpha(k4, k2) * beta(k3, k2 + k4) + 32 * beta(k2, k4) * beta(k3, k2 + k4) + alpha(k2, k4) * (35 * alpha(k3, k2 + k4) + 21 * alpha(k2 + k4, k3) + 12 * beta(k3, k2 + k4)) + 12 * alpha(k2, k3) * beta(k2 + k3, k4) + 12 * alpha(k3, k2) * beta(k2 + k3, k4) + 32 * beta(k2, k3) * beta(k2 + k3, k4)) + 216 * alpha(k1, k4) * alpha(k2, k3) * beta(k2 + k3, k1 + k4) + 216 * alpha(k1, k4) * alpha(k3, k2) * beta(k2 + k3, k1 + k4) + 216 * alpha(k2, k3) * alpha(k4, k1) * beta(k2 + k3, k1 + k4) + 216 * alpha(k3, k2) * alpha(k4, k1) * beta(k2 + k3, k1 + k4) + 576 * alpha(k2, k3) * beta(k1, k4) * beta(k2 + k3, k1 + k4) + 576 * alpha(k3, k2) * beta(k1, k4) * beta(k2 + k3, k1 + k4) + 576 * alpha(k1, k4) * beta(k2, k3) * beta(k2 + k3, k1 + k4) + 576 * alpha(k4, k1) * beta(k2, k3) * beta(k2 + k3, k1 + k4) + 1536 * beta(k1, k4) * beta(k2, k3) * beta(k2 + k3, k1 + k4) + 140 * alpha(k1, k2 + k3) * alpha(k2, k3) * beta(k1 + k2 + k3, k4) + 140 * alpha(k1, k3) * alpha(k2, k1 + k3) * beta(k1 + k2 + k3, k4) + 84 * alpha(k1, k2) * alpha(k1 + k2, k3) * beta(k1 + k2 + k3, k4) + 84 * alpha(k2, k1) * alpha(k1 + k2, k3) * beta(k1 + k2 + k3, k4) + 140 * alpha(k2, k1 + k3) * alpha(k3, k1) * beta(k1 + k2 + k3, k4) + 140 * alpha(k1, k2 + k3) * alpha(k3, k2) * beta(k1 + k2 + k3, k4) + 140 * alpha(k1, k2) * alpha(k3, k1 + k2) * beta(k1 + k2 + k3, k4) + 140 * alpha(k2, k1) * alpha(k3, k1 + k2) * beta(k1 + k2 + k3, k4) + 84 * alpha(k1, k3) * alpha(k1 + k3, k2) * beta(k1 + k2 + k3, k4) + 84 * alpha(k3, k1) * alpha(k1 + k3, k2) * beta(k1 + k2 + k3, k4) + 84 * alpha(k2, k3) * alpha(k2 + k3, k1) * beta(k1 + k2 + k3, k4) + 84 * alpha(k3, k2) * alpha(k2 + k3, k1) * beta(k1 + k2 + k3, k4) + 224 * alpha(k1 + k2, k3) * beta(k1, k2) * beta(k1 + k2 + k3, k4) + 112 * alpha(k3, k1 + k2) * beta(k1, k2) * beta(k1 + k2 + k3, k4) + 112 * alpha(k2, k1 + k3) * beta(k1, k3) * beta(k1 + k2 + k3, k4) + 224 * alpha(k1 + k3, k2) * beta(k1, k3) * beta(k1 + k2 + k3, k4) + 336 * alpha(k2, k3) * beta(k1, k2 + k3) * beta(k1 + k2 + k3, k4) + 336 * alpha(k3, k2) * beta(k1, k2 + k3) * beta(k1 + k2 + k3, k4) + 112 * alpha(k1, k2 + k3) * beta(k2, k3) * beta(k1 + k2 + k3, k4) + 224 * alpha(k2 + k3, k1) * beta(k2, k3) * beta(k1 + k2 + k3, k4) + 896 * beta(k1, k2 + k3) * beta(k2, k3) * beta(k1 + k2 + k3, k4) + 336 * alpha(k1, k3) * beta(k2, k1 + k3) * beta(k1 + k2 + k3, k4) + 336 * alpha(k3, k1) * beta(k2, k1 + k3) * beta(k1 + k2 + k3, k4) + 896 * beta(k1, k3) * beta(k2, k1 + k3) * beta(k1 + k2 + k3, k4) + 336 * alpha(k1, k2) * beta(k1 + k2, k3) * beta(k1 + k2 + k3, k4) + 336 * alpha(k2, k1) * beta(k1 + k2, k3) * beta(k1 + k2 + k3, k4) + 896 * beta(k1, k2) * beta(k1 + k2, k3) * beta(k1 + k2 + k3, k4)) / 232848.;
   }
 
+  double D_plus(double k, double a, double a_in, double m) {
+    return (a/a_in);
+  }
+
+  double dD_plus(double k, double a, double a_in, double m) {
+    return 1./a_in;
+  }
+  double ddD_plus(double k, double a, double a_in, double m) {
+    return 0;
+  }
+  double D_minus(double k, double a, double a_in, double m) {
+    return pow(a/a_in, -1.5);
+  }
+
+  double dD_minus(double k, double a, double a_in, double m) {
+    return pow(a, -5./2) * (-3./2) / pow(a_in, -3./2);
+  }
+
+  double ddD_minus(double k, double a, double a_in, double m) {
+    return pow(a,-7./2) * (-3./2) * (-5./2) / pow(a_in,-3./2);
+  }
+
+  double propagator(double k, double s, double eta, double m) {
+    double a = a_from_eta(s);
+    double b = a_from_eta(eta);
+    
+    double Dp_a   = D_plus (k, a, const_a_in, m);
+    double Dm_a   = D_minus(k, a, const_a_in, m);
+    double Dp_b   = D_plus (k, b, const_a_in, m);
+    double Dm_b   = D_minus(k, b, const_a_in, m);
+
+    double dDp_a = dD_plus (k, a, const_a_in, m) * sqrt(a);
+    double dDm_a = dD_minus(k, a, const_a_in, m) * sqrt(a);
+    //double dDp_b = dD_plus (k, b, const_a_in, m) * sqrt(b);
+    //double dDm_b = dD_minus(k, b, const_a_in, m) * sqrt(b);
+
+    double wronskian =  Dm_a * dDp_a - dDm_a * Dp_a;
+    double result    = (Dm_a *  Dp_b -  Dm_b * Dp_a) / wronskian;
+    return result;
+  }
+
+  double d_s_propagator(double k, double s, double eta, double m) {
+    double a = a_from_eta(s);
+    double b = a_from_eta(eta);
+    
+    double Dp_a      = D_plus (k, a, const_a_in, m);
+    double Dm_a      = D_minus(k, a, const_a_in, m);
+    double Dp_b      = D_plus (k, b, const_a_in, m);
+    double Dm_b      = D_minus(k, b, const_a_in, m);
+    double dDp_a     = dD_plus (k, a, const_a_in, m) * sqrt(a);
+    double dDm_a     = dD_minus(k, a, const_a_in, m) * sqrt(a);
+    //double dDp_b     = dD_plus (k, b, const_a_in, m) * sqrt(b);
+    //double dDm_b     = dD_minus(k, b, const_a_in, m) * sqrt(b);
+    double ddDp_a    = 0.5 * dD_plus (k, a, const_a_in, m)  + a * ddD_plus (k, a, const_a_in, m);
+    double ddDm_a    = 0.5 * dD_minus(k, a, const_a_in, m)  + a * ddD_minus(k, a, const_a_in, m);
+    double wronskian =   Dm_a * dDp_a - dDm_a *  Dp_a;
+    double result    = (dDm_a *  Dp_b -  Dm_b * dDp_a) / wronskian - (Dm_a * Dp_b - Dm_b * Dp_a) / (wronskian * wronskian) * (Dm_a * ddDp_a - ddDm_a * Dp_a);
+    return result;
+  }
+
+  double d_eta_propagator(double k, double s, double eta, double m) {
+    double a = a_from_eta(s);
+    double b = a_from_eta(eta);
+    
+    double Dp_a   = D_plus (k, a, const_a_in, m);
+    double Dm_a   = D_minus(k, a, const_a_in, m);
+    //double Dp_b   = D_plus (k, b, const_a_in, m);
+    //double Dm_b   = D_minus(k, b, const_a_in, m);
+    double dDp_a  = dD_plus (k, a,  const_a_in, m) * sqrt(a);
+    double dDm_a  = dD_minus (k, a, const_a_in, m) * sqrt(a);
+    double dDp_b  = dD_plus (k, b,  const_a_in, m) * sqrt(b);
+    double dDm_b  = dD_minus (k, b, const_a_in, m) * sqrt(b);
+    double wronskian =  Dm_a * dDp_a - dDm_a * Dp_a;
+    double result    = (Dm_a * dDp_b - dDm_b * Dp_a) / wronskian;
+    return result;
+  }
+
+  double d_s_eta_propagator(double k, double  s, double eta, double  m) {
+    double a = a_from_eta(s);
+    double b = a_from_eta(eta);
+
+    double Dp_a  = D_plus  (k, a, const_a_in, m);
+    double Dm_a  = D_minus (k, a, const_a_in, m);
+    //double Dp_b  = D_plus  (k, b, const_a_in, m);
+    //double Dm_b  = D_minus (k, b, const_a_in, m);
+    double dDp_a = dD_plus (k, a, const_a_in, m) * sqrt(a);
+    double dDm_a = dD_minus(k, a, const_a_in, m) * sqrt(a);
+    double dDp_b = dD_plus (k, b, const_a_in, m) * sqrt(b);
+    double dDm_b = dD_minus(k, b, const_a_in, m) * sqrt(b);
+    double ddDp_a         = 0.5 * dD_plus (k, a, const_a_in, m) + a * ddD_plus (k, a, const_a_in, m);
+    double ddDm_a         = 0.5 * dD_minus(k, a, const_a_in, m) + a * ddD_minus(k, a, const_a_in, m);
+
+    double wronskian =   Dm_a * dDp_a - dDm_a *  Dp_a;
+    double result    = (dDm_a * dDp_b - dDm_b * dDp_a) / wronskian - (Dm_a * dDp_b - dDm_b * Dp_a) / (wronskian * wronskian) * (Dm_a * ddDp_a - ddDm_a * Dp_a);
+    return result;
+  }
+
+
+  double fi_coupling(double k, double s, double eta, double m, size_t i) {
+    double a = a_from_eta(s);
+    double b = a_from_eta(eta);
+    switch(i) {
+      case 0:
+      return  D_plus(k, a, const_a_in, m) / D_plus(k, b, const_a_in, m);
+      case 1:
+      return -dD_plus(k, a, const_a_in, m) / D_plus(k, b, const_a_in, m) * sqrt(a);
+    }
+    throw std::runtime_error("fi_coupling called for i > 1");
+  }
 
   CDM_Analytical_CosmoUtil::CDM_Analytical_CosmoUtil(double eta, double eta_in) : CosmoUtil(0, eta, eta_in) {}
   double CDM_Analytical_CosmoUtil::D              (double k, double eta)                     const {return CDM::D       (eta, eta_in);}          
@@ -938,23 +960,14 @@ namespace CDM
   double CDM_Analytical_CosmoUtil::d_s_eta_greens (double k, double s, double eta)           const {return 0;}
   double CDM_Analytical_CosmoUtil::f_i            (double k, double s, double eta, size_t i) const {return 0;}
 
-  CDM_Numerical_CosmoUtil::CDM_Numerical_CosmoUtil(int fdm_mass_id, double eta, double eta_in) : CosmoUtil(0, eta, eta_in), d(new FDM::D_spline(eta_in, fdm_mass_id, true)) {}
-  double CDM_Numerical_CosmoUtil::D              (double k, double eta)                     const {return (*d)(1e-3, eta);}          
-  double CDM_Numerical_CosmoUtil::greens         (double k, double s, double eta)           const {return 0;}
-  double CDM_Numerical_CosmoUtil::d_s_greens     (double k, double s, double eta)           const {return 0;}
-  double CDM_Numerical_CosmoUtil::d_eta_greens   (double k, double s, double eta)           const {return 0;}
-  double CDM_Numerical_CosmoUtil::d_s_eta_greens (double k, double s, double eta)           const {return 0;}
-  double CDM_Numerical_CosmoUtil::f_i            (double k, double s, double eta, size_t i) const {return 0;}
+  CDM_Numerical_CosmoUtil::CDM_Numerical_CosmoUtil(int fdm_mass_id, double eta, double eta_in) : CosmoUtil(1, eta, eta_in), d(new FDM::D_spline(eta_in, fdm_mass_id, true)) {}
+  double CDM_Numerical_CosmoUtil::D              (double k, double eta)                     const {return (*d)(1e-3, eta);}       
+  double CDM_Numerical_CosmoUtil::greens         (double k, double s, double eta)           const {return propagator         (k, s, eta, m);}
+  double CDM_Numerical_CosmoUtil::d_s_greens     (double k, double s, double eta)           const {return d_s_propagator     (k, s, eta, m);}
+  double CDM_Numerical_CosmoUtil::d_eta_greens   (double k, double s, double eta)           const {return d_eta_propagator   (k, s, eta, m);}
+  double CDM_Numerical_CosmoUtil::d_s_eta_greens (double k, double s, double eta)           const {return d_s_eta_propagator (k, s, eta, m);}
+  double CDM_Numerical_CosmoUtil::f_i            (double k, double s, double eta, size_t i) const {return fi_coupling        (k, s, eta, m, i);}
   
-  CDM_TD_CosmoUtil::CDM_TD_CosmoUtil(int fdm_mass_id, double eta, double eta_in) : CosmoUtil(1, eta, eta_in), d(new FDM::D_spline(eta_in, fdm_mass_id, true))  {}
-  double CDM_TD_CosmoUtil::D              (double k, double eta)                     const {return (*d)(1e-3, eta);}          
-  double CDM_TD_CosmoUtil::greens         (double k, double s, double eta)           const {return FDM::greens_analytical         (k, s, eta, m);}
-  double CDM_TD_CosmoUtil::d_s_greens     (double k, double s, double eta)           const {return FDM::d_s_greens_analytical     (k, s, eta, m);}
-  double CDM_TD_CosmoUtil::d_eta_greens   (double k, double s, double eta)           const {return FDM::d_eta_greens_analytical   (k, s, eta, m);}
-  double CDM_TD_CosmoUtil::d_s_eta_greens (double k, double s, double eta)           const {return FDM::d_s_eta_greens_analytical (k, s, eta, m);}
-  double CDM_TD_CosmoUtil::f_i            (double k, double s, double eta, size_t i) const {return FDM::f_i_analytical            (k, s, eta, m, i);}
-  
-
 }
 
 // Define namespace for all Fuzzy Dark Matter related functions
@@ -2080,17 +2093,6 @@ vec Spectrum::get_result(double k, const CosmoUtil &cu) const
 namespace CDM
 {
 
-  double InitialCDMSpectrum::operator()(double k, const CosmoUtil &cu) const
-  {
-    return P0(k) * pow(cu.D(k, cu.eta), 2);
-  }
-
-  double InitialFDMSpectrum::operator()(double k, const CosmoUtil &cu) const
-  {
-    double T = FDM::empirical_transfer(k, cu.eta, cu.eta_in, cu.m);
-    // std::cout<<a_from_eta(cu.eta)<<"    "<<k<<std::endl;
-    return P0(k) * pow(T * cu.D(k, cu.eta), 2);
-  }
 
   double ScaleFreeSpectrum::operator()(double k, const CosmoUtil &cu) const
   {
@@ -2100,26 +2102,10 @@ namespace CDM
 
 namespace FDM
 {
-
-  double InitialFDMSpectrum::operator()(double k, const CosmoUtil &cu) const
-  {
-    double d, t, p0;
-    d = cu.D(k, cu.eta); // typically 100 for a = 1.0
-    t = empirical_transfer(k, cu.eta, cu.eta_in, cu.m);
-    p0 = P0(k);
-    return p0 * pow(t * d, 2);
-  }
-
-  double InitialCDMSpectrum::operator()(double k, const CosmoUtil &cu) const
-  {
-    return P0(k) * pow(cu.D(k, cu.eta), 2);
-  }
-
   double ScaleFreeSpectrum::operator()(double k, const CosmoUtil &cu) const
   {
     return pow(k, n_) * pow(cu.D(k, cu.eta), 2.);
   }
-
 }
 /***
  * SPECTRUM END
@@ -2646,7 +2632,7 @@ namespace FDM
     double p, p_error, p_Q;
     T0_IC ic(k1, k2, k3, k4, P, cu, NULL);
     void *data = (void *)&ic;
-    cuba_integrate(T0i_cuba, 2, data, p, p_error, p_Q, 4, 0, CUBA_ALGORITHMS::VEGAS, 1e-2, 1e-36);
+    cuba_integrate(T0i_cuba, 2, data, p, p_error, p_Q, 4, 2, CUBA_ALGORITHMS::CUHRE, 1e-2, 1e-36);
 
     result[0] = p;
     result[1] = p_error;
@@ -2904,9 +2890,6 @@ namespace FDM
 
     T0_IC *c = (struct T0_IC *)userdata;
 
-    // CAUTION: ACTUALLY THE ANALYTICALLY CORRECT EXPRESSION WOULD BE eta_i = cu.eta_in, BUT FOR AGREEMENT WITH THE CDM F_i, WE NEED 0, THIS CAUSES AROUND 1% error
-    // c->cu.eta_in = smalleps;
-
     double eta_f = c->cu.eta;
     double eta_i = c->cu.eta_in;
 
@@ -2965,10 +2948,16 @@ namespace FDM
 
     double res = 6 * c->P(kn, c->cu) * c->P(k1n, c->cu) * F3(k, k1, -k1, s1, s2, c->cu);
 
-    if (k1n < k2n)
+    if (k1n < k2n) {
+      if ((k1n > verysmalleps) && (k2n > verysmalleps)) {
       res += 2 * c->P(k1n, c->cu) * c->P(k2n, c->cu) * F2(k1, k2, s1, c->cu) * F2(k1, k2, s2, c->cu);
-    if (k1n < k3n)
+      }
+    }
+    if (k1n < k3n) {
+      if ((k1n > verysmalleps) && (k3n > verysmalleps)) {
       res += 2 * c->P(k1n, c->cu) * c->P(k3n, c->cu) * F2(-k1, k3, s1, c->cu) * F2(-k1, k3, s2, c->cu);
+      }
+    }
 
     // Jacobi-determinant, Fourier convention and phi-integration and variable change from eta to a
     res *= det * k1n * k1n * 1 / (4 * M_PI * M_PI);
@@ -3325,7 +3314,7 @@ namespace FDM
         cuba_integrate(P1Li_cuba, 4, data, p, p_error, p_Q, -gridno);
         std::cout << "Reset complete \n";
       }
-      cuba_integrate(P1Li_cuba, 4, data, p, p_error, p_Q, gridno, 1, CUBA_ALGORITHMS::DIVONNE, 0.01, 1e-20);
+      cuba_integrate(P1Li_cuba, 4, data, p, p_error, p_Q, gridno, 1, CUBA_ALGORITHMS::VEGAS, 0.1, 1e-20);
       if (((P(k, cu) + p) > 0))
       {
         break;
@@ -3363,9 +3352,9 @@ namespace FDM
   // Special constructor that initialises vegas integrator with the given k vectors and integration context
   NLBispectrum::NLBispectrum(const Spectrum &P, const Bispectrum &tree, double r_low, double r_high, const vec &k1, const vec &k2, const vec &k3, const CosmoUtil &cu, int gridno) : Bispectrum(P), tree(tree), r_low(r_low), r_high(r_high), gridno(gridno)
   {
-    B1L_IC ic(k1, k2, k3, P, cu, r_low, r_high);
-    void *USERDATA = (void *)&ic;
-    double b1, b1_error, b1_Q;
+    //B1L_IC ic(k1, k2, k3, P, cu, r_low, r_high);
+    //void *USERDATA = (void *)&ic;
+    //double b1, b1_error, b1_Q;
 
     //cuba_integrate(B1Li_cuba, 6, USERDATA, b1, b1_error, b1_Q, -gridno);
   }
