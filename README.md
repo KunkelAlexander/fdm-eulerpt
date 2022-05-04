@@ -11,7 +11,10 @@ Both codes are largely redundant, implement mostly the same functions and featur
 
 ## Compilation
 Set include and library paths and compile with
+
+```
 g++ -I/path_to_cuba -std=c++11 -O3 pt_main.cpp spectrum.cpp -o pt_main -lgsl -lgslcblas -lgslwrap -lcuba -lm
+```
 
 ## Dependencies
 
