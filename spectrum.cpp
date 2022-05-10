@@ -2544,12 +2544,12 @@ namespace FDM
   {
     double r1, r2;
 
-    // 12 pair-wise permutations
+    // 6 pair-wise permutations
     r1 = (t2(P, k1, k2, k3, k4, s1, s2, cu) +
-          t2(P, k1, k3, k2, k4, s1, s2, cu) + // 1 <-> 3
-          t2(P, k1, k4, k2, k3, s1, s2, cu) + // 2 <-> 1 + 3 <-> 4
-          t2(P, k2, k3, k1, k4, s1, s2, cu) + // 2 <-> 4
-          t2(P, k2, k4, k1, k3, s1, s2, cu) + // 2 <-> 4
+          t2(P, k1, k3, k2, k4, s1, s2, cu) + 
+          t2(P, k1, k4, k2, k3, s1, s2, cu) + 
+          t2(P, k2, k3, k1, k4, s1, s2, cu) + 
+          t2(P, k2, k4, k1, k3, s1, s2, cu) + 
           t2(P, k3, k4, k1, k2, s1, s2, cu));
     // 4 cyclic permutations
     r2 = (t3(P, k1, k2, k3, k4, s1, s2, cu) +
@@ -2569,7 +2569,7 @@ namespace FDM
     // Outer integrand
     auto outer_integrand = [](double eta, void *params) -> double
     {
-      // Define integrand
+      // Inner integrand
       auto inner_integrand = [](double s, void *params) -> double
       {
         T0_IC *ic = (struct T0_IC *)params;
@@ -2632,7 +2632,7 @@ namespace FDM
     double p, p_error, p_Q;
     T0_IC ic(k1, k2, k3, k4, P, cu, NULL);
     void *data = (void *)&ic;
-    cuba_integrate(T0i_cuba, 2, data, p, p_error, p_Q, 4, 2, CUBA_ALGORITHMS::CUHRE, 1e-2, 1e-36);
+    cuba_integrate(T0i_cuba, 2, data, p, p_error, p_Q, 4, 2, CUBA_ALGORITHMS::CUHRE, 1e-2, 0);
 
     result[0] = p;
     result[1] = p_error;

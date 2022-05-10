@@ -28,7 +28,7 @@
 typedef gsl::vector_float vec;
 
 //Default maximum number of integrand evaluations for CUBA integrations
-const size_t max_evaluations = 400000;
+const size_t max_evaluations = 2000000;
 #define SPLINE_RANGE_CHECK
 
 /***
@@ -563,18 +563,6 @@ namespace CDM
     //Use 2-dimensional FDM spline and evaluate at low k to make sure that CDM and FDM growth factors at low k are exactly equal
     std::shared_ptr<FDM::D_spline> d;
     CDM_Numerical_CosmoUtil(int fdm_mass_id, double eta, double eta_in);
-    double D              (double k, double eta)                     const;    
-    double greens         (double k, double s, double eta)           const;
-    double d_s_greens     (double k, double s, double eta)           const;
-    double d_eta_greens   (double k, double s, double eta)           const;
-    double d_s_eta_greens (double k, double s, double eta)           const;
-    double f_i            (double k, double s, double eta, size_t i) const;
-  };
-
-  struct CDM_TD_CosmoUtil : public CosmoUtil {
-    //Use 2-dimensional FDM spline and evaluate at low k to make sure that CDM and FDM growth factors at low k are exactly equal
-    std::shared_ptr<FDM::D_spline> d;
-    CDM_TD_CosmoUtil(int fdm_mass_id, double eta, double eta_in);
     double D              (double k, double eta)                     const;    
     double greens         (double k, double s, double eta)           const;
     double d_s_greens     (double k, double s, double eta)           const;

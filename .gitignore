@@ -357,3 +357,6 @@ libraries
 *.npz
 *.dat
 *.guess
+
+IC/axionCAMB
+IC/CAMB

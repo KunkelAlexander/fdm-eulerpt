@@ -671,7 +671,7 @@ void computeLoopSpectra(int fdm_mass_id)
     #if 1
         cout << "Load CDM CAMB spectrum \n";
         CAMBSpectrum P_cdm(cdm_camb_path);
-        CDM::CDM_TD_CosmoUtil cu_cdm(fdm_mass_id, const_eta_fin, const_eta_in);
+        CDM::CDM_Numerical_CosmoUtil cu_cdm(fdm_mass_id, const_eta_fin, const_eta_in);
         FDM::NLSpectrum P1L_cdm(P_cdm, const_vegas_ir_cutoff, const_vegas_uv_cutoff, k0, cu_cdm, 1);
         cout << "Integrate CDM Loop corrections. \n";
         computeLoopPowerSpectrum(cu_cdm, cu_cdm, P_cdm, P1L_cdm, cdm_string+"_td", N);
@@ -828,7 +828,7 @@ void computeLoopBispectra(int fdm_mass_id)
 
 void computeTreeTrispectra(int fdm_mass_id)
 {
-    int N = 100;
+    int N = 10;
 
     
     CAMBSpectrum P_cdm(cdm_camb_path);
@@ -836,7 +836,7 @@ void computeTreeTrispectra(int fdm_mass_id)
     CDM::CDM_Numerical_CosmoUtil     cu_cdm(fdm_mass_id, const_eta_fin, const_eta_in);
     FDM::FDM_SemiNumerical_CosmoUtil cu_fdm(fdm_mass_id, const_eta_fin, const_eta_in);
 
-    #if 0
+    #if 1
     CDM::TreeTrispectrum T_cdm(P_cdm);
     std::cout << "compute CDM Tree Trispectra \n";
     {
@@ -914,7 +914,7 @@ void computeTreeTrispectrumDifference(int fdm_mass_id)
 
 int main()
 {
-    for (int i = 0; i < 1; ++ i) {
+    for (int i = 0; i < 3; ++ i) {
 
     //Growth factors
     #if 0
@@ -972,7 +972,7 @@ int main()
     #endif
 
     //Tree Trispectra
-    #if 0
+    #if 1
         computeTreeTrispectra(i);
     #endif
     
