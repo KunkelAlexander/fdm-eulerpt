@@ -1,0 +1,8 @@
+numpy
+scipy
+numba
+numba-scipy
+camb
+vegas
+matplotlib
+uncertainties
