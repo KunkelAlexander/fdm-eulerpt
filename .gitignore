@@ -360,3 +360,7 @@ libraries
 
 IC/axionCAMB
 IC/CAMB
+.ipynb_checkpoints
+tomo.cpp 
+tomo.h 
+lensing_main.cpp 
