@@ -364,3 +364,5 @@ IC/CAMB
 tomo.cpp 
 tomo.h 
 lensing_main.cpp 
+__pycache__
+.ipynb_checkpoints
