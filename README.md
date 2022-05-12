@@ -5,11 +5,12 @@ This code computes the tree- and loop-level matter power spectra and matter bisp
 It expects initial spectra in the form provided by CAMB (https://github.com/cmbant/CAMB) or axionCAMB (https://github.com/dgrin1/axionCAMB), computes the growth linear growth and decay factors as well as the spectrum correction in a dark energy universe for both CDM and FDM.
 
 ## Usage
-The folder "cpp" contains the C++-code that uses the CUBA (http://www.feynarts.de/cuba/) library for carrying out numerical integrations. 
+The folder "c++" contains the C++-code that uses the CUBA (http://www.feynarts.de/cuba/) library for carrying out numerical integrations. 
 The folder "python" contains python code that uses the vegas (https://vegas.readthedocs.io/en/latest/) library for carrying out numerical integrations.
 Both codes are largely redundant, implement mostly the same functions and features and were used for cross-checking results. The C++-code is to be preferred for performance reasons. 
 
 ## Compilation
+### C++
 Set include and library paths and compile with
 
 ```
