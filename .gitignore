@@ -366,3 +366,5 @@ tomo.h
 lensing_main.cpp 
 __pycache__
 .ipynb_checkpoints
+c++/src/lensing_code_test.cpp
+c++/include/tomo.h
