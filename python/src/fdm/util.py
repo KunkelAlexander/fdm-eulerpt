@@ -24,7 +24,7 @@ def b_f(k, m):
 #Equation (18) from Li 2020
 @njit
 def li_kj(a, m, omega_m = c.OMEGA_M):
-  return 44.7*(6*a*omega_m/0.3)**(0.25) * (c.H0_HUBBLE/70*m/(1e-22))**0.5  #Mpc^-1
+  return 44.7*(6*a*omega_m/0.3)**(0.25) * (100/70*m/(1e-22))**0.5  #Mpc^-1
 
 @njit
 def li_aj(k, m, omega_m = c.OMEGA_M_GROWTH):

@@ -56,10 +56,10 @@ const std::string fdm_mass_strings[3]    = {"m21", "m22", "m23"};
 const std::string fdm_strings[3]         = {cosmo_string + "_m21", cosmo_string + "_m22", cosmo_string + "_m23"};
 const std::string cdm_fdm_ic_strings[3]  = {cosmo_string + "_cdm_m21", cosmo_string + "_cdm_m22", cosmo_string + "_cdm_m23"};
 const std::string fdm_camb_paths[3]      = {"IC/m21.dat", "IC/m22.dat", "IC/m23.dat"};
-
-const double fdm_growth_factor_fit_alpha[3] = {0.61, 0.61, 0.61};
-const double fdm_growth_factor_fit_beta[3] = {6.46, 6.46, 6.46};
-
+ 
+const double fdm_growth_factor_fit_alpha[3] = {0.67283732, 0.6111296, 0.04052777};
+const double fdm_growth_factor_fit_beta[3] = {4.79860291, 7.72606649, 6.49101277};
+    
 //const std::string cdm_loop_spectrum_path        = "";//"splines/cdm.dat";
 //const std::string fdm_loop_spectrum_path        = "";//"splines/"+fdm_string+".dat";
 const std::string cdm_loop_lensing_path           = "data/lensing_spectrum/loop/"+ cdm_string + ".dat";

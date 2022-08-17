@@ -23,20 +23,20 @@ class CosmologyModes(Enum):
     LAMBDA           = 3
 
 
-COSMOLOGY_MODE    = CosmologyModes.DARK_ENERGY
+COSMOLOGY_MODE    = CosmologyModes.MATTER_DOMINATED
 
 if COSMOLOGY_MODE == CosmologyModes.MATTER_DOMINATED:
   OMEGA_M         = 1.0
   OMEGA_DM        = OMEGA_M
   FDM_M           = 1e-23 #Mass of FDM in units of eV
-  H_HUBBLE        = 0.68
+  H_HUBBLE        = 1#0.68
   OMEGA_M_GROWTH  = 1.0
 elif COSMOLOGY_MODE == CosmologyModes.DARK_ENERGY:
   FDM_M           = 1e-23
   OMEGA_M         = 0.3
   OMEGA_M_GROWTH  = 0.3
   OMEGA_B         = 0.04
-  H_HUBBLE        = 0.68
+  H_HUBBLE        = 1#0.68
   OMEGA_DM        = OMEGA_M - OMEGA_B
   OMEGA_Q         = 1 - OMEGA_M
   W_DARK_ENERGY   = -0.9 
@@ -45,7 +45,7 @@ elif COSMOLOGY_MODE == CosmologyModes.LAMBDA:
   FDM_M           = 8e-23
   OMEGA_M         = 0.315903
   OMEGA_M_GROWTH  = 0.315903
-  H_HUBBLE        = 0.67321170
+  H_HUBBLE        = 1#0.67321170
   OMEGA_B         = 0.022383/H_HUBBLE**2
   OMEGA_DM        = OMEGA_M - OMEGA_B
   OMEGA_Q         = 1 - OMEGA_M
@@ -238,4 +238,4 @@ SPLINE_MOMENTA         = np.logspace(-4, 2, N_SPLINE_MOMENTA)
 SPLINE_SCALE_FACTORS   = np.insert(np.logspace(-2, 0, N_SPLINE_SCALE_FACTORS - 1), 0, A_IN)
 SPLINE_FILE            = f"splines/fdm_cos_{COSMOLOGY_MODE}_om_{OMEGA_M_GROWTH}_m_{FDM_M}_Nk_{N_SPLINE_MOMENTA}_Na_{N_SPLINE_SCALE_FACTORS}.npz"
 
-FIT_TO_SPLINE  = False
+FIT_TO_SPLINE  = True

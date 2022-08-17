@@ -1476,7 +1476,7 @@ namespace FDM
   double jeans_scale(double eta, double m)
   {
     double a = a_from_eta(eta);
-    return 44.7 * const_h_hubble * pow(6 * a * const_omega_m / 0.3, 0.25) * pow(1 / 0.7 * m / (1e-22), 0.5); // #Mpc^-1
+    return 44.7 * const_h_hubble * pow(6 * a * const_omega_m / 0.3, 0.25) * pow(m / (1e-22), 0.5); // #Mpc^-1
   }
 
   // Mass and momentum dependent FDM-scale
@@ -3189,7 +3189,7 @@ namespace CDM
     void *data = (void *)&ic;
 
     // Perform integration
-    cuba_integrate(P1Li_cuba, 2, data, p, p_error, p_Q, gridno, 1, CUBA_ALGORITHMS::VEGAS, 0.01, 1e-10);
+    cuba_integrate(P1Li_cuba, 2, data, p, p_error, p_Q, gridno, 1, CUBA_ALGORITHMS::SUAVE, 0.01, 1e-20);
 
     vec result(3);
     result[0] = p;

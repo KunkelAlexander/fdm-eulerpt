@@ -855,7 +855,7 @@ enum CUBA_ALGORITHMS {
   DIVONNE
 };
 
-int cuba_integrate(integrand_t Integrand, int NDIM, void *USERDATA, double &result, double &uncertainty, double &probability, int gridno = 1, int VERBOSE = 0, CUBA_ALGORITHMS alg = CUBA_ALGORITHMS::VEGAS, double RELERR = 1e-1, double ABSERR = 1e-20, void* spin = NULL, size_t maxeval = max_evaluations);
+int cuba_integrate(integrand_t Integrand, int NDIM, void *USERDATA, double &result, double &uncertainty, double &probability, int gridno = 1, int VERBOSE = 0, CUBA_ALGORITHMS alg = CUBA_ALGORITHMS::VEGAS, double RELERR = 5e-3, double ABSERR = 1e-20, void* spin = NULL, size_t maxeval = max_evaluations);
 int cuba_verbose_integrate(integrand_t Integrand, int NDIM, void *USERDATA);
 
 //Python logspace function template

@@ -218,7 +218,7 @@ void computeLoopPowerSpectrum(const CosmoUtil &cu_l, const CosmoUtil &cu_nl, con
 
     std::vector<double> x(n), y1(n), y2(n), y2_err(n), y2_Q(n);
     
-    x = pyLogspace(2, 3, n);
+    x = pyLogspace(-4, 3, n);
 
     for (size_t i = 0; i < n; ++i)
     {
@@ -635,11 +635,18 @@ void computeTreeSpectra(int fdm_mass_id, size_t N = 1000)
     #endif
 
 
-    #if 1
+    #if 0
     cout << "Integrate FDM growth factor \n";
     FDM::FDM_Fit_CosmoUtil cu_fdm_num(fdm_mass_id, const_eta_fin, const_eta_in);
     cout << "Compute FDM spectra\n";
     computeSpectrum(cu_fdm_num, P_fdm, "fit_"+fdm_strings[fdm_mass_id], N);
+    #endif
+
+    #if 1
+    cout << "Integrate FDM growth factor \n";
+    CDM::CDM_Numerical_CosmoUtil cu_cdm_num(fdm_mass_id, const_eta_fin, const_eta_in);
+    cout << "Compute FDM spectra\n";
+    computeSpectrum(cu_cdm_num, P_fdm, cdm_fdm_ic_strings[fdm_mass_id], N);
     #endif
 }
 
@@ -666,14 +673,14 @@ void computeLoopSpectra(int fdm_mass_id)
 {
     // Use special constructor that initialises vegas integrator by running one integration with k0
     double k0 = 1e-4;
-    int N = 5;
+    int N = 50;
 
-    #if 1
+    #if 0
         cout << "Load CDM CAMB spectrum \n";
         CAMBSpectrum P_cdm(cdm_camb_path);
         CDM::CDM_Numerical_CosmoUtil cu_cdm(fdm_mass_id, const_eta_fin, const_eta_in);
         FDM::NLSpectrum P1L_cdm(P_cdm, const_vegas_ir_cutoff, const_vegas_uv_cutoff, k0, cu_cdm, 1);
-        cout << "Integrate CDM Loop corrections. \n";
+        cout << "Integrate CDM loop corrections. \n";
         computeLoopPowerSpectrum(cu_cdm, cu_cdm, P_cdm, P1L_cdm, cdm_string+"_td", N);
     #endif
     
@@ -683,8 +690,19 @@ void computeLoopSpectra(int fdm_mass_id)
         FDM::FDM_SemiNumerical_CosmoUtil cu_fdm_num(fdm_mass_id, const_eta_fin, const_eta_in);
         FDM::NLSpectrum P1L_fdm(P_fdm, const_vegas_ir_cutoff, const_vegas_uv_cutoff, k0, cu_fdm_num, 0);
 
-        cout << "Integrate FDM Loop corrections. \n";
+        cout << "Integrate FDM loop corrections. \n";
         computeLoopPowerSpectrum(cu_fdm_num, cu_fdm_num, P_fdm, P1L_fdm, fdm_strings[fdm_mass_id], N);
+    #endif
+
+
+    #if 1
+        cout << "Load FDM CAMB spectrum \n";
+        CAMBSpectrum P_fdm(fdm_camb_paths[fdm_mass_id]);
+        CDM::CDM_Numerical_CosmoUtil cu_cdm_num(fdm_mass_id, const_eta_fin, const_eta_in);
+        CDM::NLSpectrum P1L_cdm(P_fdm, const_vegas_ir_cutoff, const_vegas_uv_cutoff, k0, cu_cdm_num, 0);
+
+        cout << "Integrate CDM FDM IC loop corrections. \n";
+        computeLoopPowerSpectrum(cu_cdm_num, cu_cdm_num, P_fdm, P1L_cdm, cdm_fdm_ic_strings[fdm_mass_id], N);
     #endif
 }
 
@@ -828,7 +846,7 @@ void computeLoopBispectra(int fdm_mass_id)
 
 void computeTreeTrispectra(int fdm_mass_id)
 {
-    int N = 10;
+    int N = 100;
 
     
     CAMBSpectrum P_cdm(cdm_camb_path);
@@ -836,7 +854,7 @@ void computeTreeTrispectra(int fdm_mass_id)
     CDM::CDM_Numerical_CosmoUtil     cu_cdm(fdm_mass_id, const_eta_fin, const_eta_in);
     FDM::FDM_SemiNumerical_CosmoUtil cu_fdm(fdm_mass_id, const_eta_fin, const_eta_in);
 
-    #if 1
+    #if 0
     CDM::TreeTrispectrum T_cdm(P_cdm);
     std::cout << "compute CDM Tree Trispectra \n";
     {
@@ -845,7 +863,7 @@ void computeTreeTrispectra(int fdm_mass_id)
     }
     #endif
 
-    #if 1
+    #if 0
     FDM::TreeTrispectrumCuba T_fdm_vegas(P_fdm);
     std::cout << "compute FDM Tree Trispectra by integrating using Vegas \n";
     {
@@ -861,9 +879,19 @@ void computeTreeTrispectra(int fdm_mass_id)
     std::cout << "compute FDM Tree Trispectra by integrating using gsl \n";
     {
         //boost::timer::auto_cpu_timer t;
-        computeEquilateralTrispectra(cu_fdm, T_fdm, "fdm_gsl", N);
+        computeEquilateralTrispectra(cu_fdm, T_fdm, fdm_strings[fdm_mass_id], N);
     }
     gsl_set_error_handler(old_handler);
+    #endif
+
+
+    #if 1
+    CDM::TreeTrispectrum T_cdm(P_fdm);
+    std::cout << "compute CDM Tree trispectra with FDM IC \n";
+    {
+        //boost::timer::auto_cpu_timer t;
+        computeEquilateralTrispectra(cu_cdm, T_cdm, cdm_fdm_ic_strings[fdm_mass_id], N);
+    }
     #endif
 }
 
@@ -922,7 +950,7 @@ int main()
     #endif 
 
     //Relative suppression between cdm and fdm growth factors
-    #if 0 
+    #if 0
         computeFDMSuppression(const_a_fin, i);
     #endif
     
